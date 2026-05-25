@@ -1,0 +1,17 @@
+Param,Value
+LB,128
+MN,16
+MX,80
+PT,0.45
+AM,150
+TN,3
+MC,0.08
+TP,100
+SL,80
+ST,72
+IV,0
+Capital,100.0
+Lot,0.01
+Spread,0.2
+FinalEquity,389.2
+TotalTrades,564
