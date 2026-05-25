@@ -4,6 +4,7 @@ from datetime import datetime
 P="XAU_1h_data.csv"
 ODIR="results"
 CAP,LOT,SPR,PIP,CSZ=100.0,0.01,0.20,0.10,100
+TGT_LO,TGT_HI=5,10
 
 _T={}
 def tw(n):
@@ -35,6 +36,30 @@ def hn(n):
     if n in _H:return _H[n]
     _H[n]=[0.5-0.5*math.cos(2*math.pi*k/(n-1)) for k in range(n)]
     return _H[n]
+
+def ema(cls,n):
+    a=2.0/(n+1)
+    e=cls[0]
+    out=[e]
+    for c in cls[1:]:
+        e=a*c+(1-a)*e
+        out.append(e)
+    return out
+
+def atr(rows,n):
+    out=[0.0]
+    prev=rows[0][4]
+    trs=[]
+    a=2.0/(n+1)
+    e=0.0
+    for i in range(1,len(rows)):
+        h,l,c=rows[i][2],rows[i][3],rows[i][4]
+        tr=max(h-l,abs(h-prev),abs(l-prev))
+        if i==1:e=tr
+        else:e=a*tr+(1-a)*e
+        out.append(e)
+        prev=c
+    return out
 
 def ld():
     rs=[]
@@ -92,74 +117,111 @@ def sig(w,p):
     if cf<p['MC'] or sg=='N':return None
     return sg
 
-def bt(rows,p):
+def bt(rows,p,em_arr,em_arr2):
     n=len(rows);L=p['LB']
-    eq=CAP;rec=[];pos=None;last=-10**9
-    tp=p['TP']*PIP;sl=p['SL']*PIP;st=p['ST'];inv=p.get('IV',0)
+    eq=CAP;rec=[];pos=[]
+    last=-10**9
+    tp=p['TP']*PIP;sl=p['SL']*PIP;st=p['ST'];inv=p.get('IV',0);mp=p['MP']
+    sd=p.get('SD',0);tf=p.get('TF',0)
     cls=[r[4] for r in rows]
     for i in range(L,n):
         dt,op,hi,lo,c=rows[i]
-        if pos:
-            if pos['s']=='B':
-                if lo<=pos['sl']:
-                    pl=(pos['sl']-pos['e']-SPR)*CSZ*LOT
-                    eq+=pl;rec.append([pos['t'],dt,'BUY',pos['e'],pos['sl'],pl,'SL']);pos=None
-                elif hi>=pos['tp']:
-                    pl=(pos['tp']-pos['e']-SPR)*CSZ*LOT
-                    eq+=pl;rec.append([pos['t'],dt,'BUY',pos['e'],pos['tp'],pl,'TP']);pos=None
+        keep=[]
+        for ps in pos:
+            cl_=False
+            if ps['s']=='B':
+                if lo<=ps['sl']:
+                    pl=(ps['sl']-ps['e']-SPR)*CSZ*LOT
+                    eq+=pl;rec.append([ps['t'],dt,'BUY',ps['e'],ps['sl'],pl,'SL']);cl_=True
+                elif hi>=ps['tp']:
+                    pl=(ps['tp']-ps['e']-SPR)*CSZ*LOT
+                    eq+=pl;rec.append([ps['t'],dt,'BUY',ps['e'],ps['tp'],pl,'TP']);cl_=True
             else:
-                if hi>=pos['sl']:
-                    pl=(pos['e']-pos['sl']-SPR)*CSZ*LOT
-                    eq+=pl;rec.append([pos['t'],dt,'SELL',pos['e'],pos['sl'],pl,'SL']);pos=None
-                elif lo<=pos['tp']:
-                    pl=(pos['e']-pos['tp']-SPR)*CSZ*LOT
-                    eq+=pl;rec.append([pos['t'],dt,'SELL',pos['e'],pos['tp'],pl,'TP']);pos=None
-        if pos is None and (i-last)>=st:
+                if hi>=ps['sl']:
+                    pl=(ps['e']-ps['sl']-SPR)*CSZ*LOT
+                    eq+=pl;rec.append([ps['t'],dt,'SELL',ps['e'],ps['sl'],pl,'SL']);cl_=True
+                elif lo<=ps['tp']:
+                    pl=(ps['e']-ps['tp']-SPR)*CSZ*LOT
+                    eq+=pl;rec.append([ps['t'],dt,'SELL',ps['e'],ps['tp'],pl,'TP']);cl_=True
+            if not cl_:keep.append(ps)
+        pos=keep
+        if len(pos)<mp and (i-last)>=st:
             s=sig(cls[i-L+1:i+1],p)
             if s in ('B','S'):
                 if inv:s='S' if s=='B' else 'B'
+                if tf:
+                    e1=em_arr[i];e2=em_arr2[i]
+                    up=e1>e2
+                    if s=='B' and not up:continue
+                    if s=='S' and up:continue
+                if sd:
+                    sd_ok=True
+                    for ps in pos:
+                        if (ps['s']=='B' and s=='B') or (ps['s']=='S' and s=='S'):
+                            if abs(c-ps['e'])<sd*PIP:sd_ok=False;break
+                    if not sd_ok:continue
                 e=c
-                if s=='B':pos={'s':'B','e':e,'tp':e+tp,'sl':e-sl,'t':dt}
-                else:pos={'s':'S','e':e,'tp':e-tp,'sl':e+sl,'t':dt}
+                if s=='B':pos.append({'s':'B','e':e,'tp':e+tp,'sl':e-sl,'t':dt})
+                else:pos.append({'s':'S','e':e,'tp':e-tp,'sl':e+sl,'t':dt})
                 last=i
     return eq,rec
 
 SP={'LB':[128,256],'MN':[8,12,16,24],'MX':[80,120,200],
-    'PT':[0.3,0.45,0.6,0.75],'AM':[60,100,150,250],'TN':[1,3,5],
-    'MC':[0.05,0.08,0.12,0.18],'TP':[40,60,80,100],'SL':[30,50,80,120],
-    'ST':[24,48,72],'IV':[0,1]}
+    'PT':[0.3,0.45,0.6],'AM':[60,100,150],'TN':[1,3,5],
+    'MC':[0.03,0.05,0.08,0.12],'TP':[60,80,100],'SL':[30,40,50,60],
+    'ST':[1,2],'IV':[0,1],'MP':[10,15],'SD':[0,30],
+    'TF':[1],'EF':[24,50,100,200],'ES':[200,400,800,1500]}
 
 def rp():return {k:random.choice(v) for k,v in SP.items()}
 
+def score(eq,rec,nday):
+    pnl=eq-CAP
+    nt=len(rec)
+    tpd=nt/max(nday,1)
+    if tpd<TGT_LO*0.6 or tpd>TGT_HI*2.5:return -1e9,tpd
+    pen=0.0
+    if tpd<TGT_LO:pen+=(TGT_LO-tpd)*200
+    elif tpd>TGT_HI:pen+=(tpd-TGT_HI)*100
+    return pnl-pen,tpd
+
 def main():
     rows=ld()
-    print(f"Loaded {len(rows)} bars  {rows[0][0]} -> {rows[-1][0]}",flush=True)
+    nday=(rows[-1][0]-rows[0][0]).days
+    print(f"Loaded {len(rows)} bars  {rows[0][0]} -> {rows[-1][0]}  ({nday}d)",flush=True)
+    cls=[r[4] for r in rows]
+    em_cache={}
+    def get_ema(n):
+        if n not in em_cache:em_cache[n]=ema(cls,n)
+        return em_cache[n]
     random.seed(42)
     best=None;bv=-1e18
-    N=int(os.environ.get('N','40'))
+    N=int(os.environ.get('N','80'))
     t0=time.time();seen=set()
     for it in range(N):
-        for _ in range(50):
+        for _ in range(80):
             p=rp()
             k=tuple(sorted(p.items()))
             if k in seen:continue
             if p['SL']>p['TP']*1.5 or p['MN']>=p['MX']:continue
+            if p['EF']>=p['ES']:continue
             seen.add(k);break
         else:break
         ti=time.time()
-        try:eq,rec=bt(rows,p)
+        e1=get_ema(p['EF']);e2=get_ema(p['ES'])
+        try:eq,rec=bt(rows,p,e1,e2)
         except Exception as ex:print("err",ex);continue
-        nt=len(rec);sc=eq-CAP
-        if nt<10:sc-=500
+        sc,tpd=score(eq,rec,nday)
+        nt=len(rec)
         wins=sum(1 for r in rec if r[5]>0)
         wr=wins/nt if nt else 0
-        print(f"[{it+1}/{N}] {time.time()-t0:6.1f}s ({time.time()-ti:5.1f}s) eq={eq:7.2f} n={nt:4d} wr={wr:.2f} sc={sc:7.2f} p={p}",flush=True)
-        if sc>bv:bv=sc;best=(p,eq,rec)
+        flag='*' if TGT_LO<=tpd<=TGT_HI else ' '
+        print(f"[{it+1}/{N}] {time.time()-t0:6.1f}s ({time.time()-ti:5.1f}s){flag} eq={eq:8.2f} n={nt:5d} t/d={tpd:5.2f} wr={wr:.2f} sc={sc:9.2f} tf={p['TF']} iv={p['IV']} tp={p['TP']} sl={p['SL']}",flush=True)
+        if sc>bv:bv=sc;best=(p,eq,rec,tpd)
     if best is None:print("no result");return
-    p,eq,rec=best
+    p,eq,rec,tpd=best
     print(f"\nDone in {time.time()-t0:.1f}s")
     print(f"Best params: {p}")
-    print(f"Final equity: ${eq:.2f}  Total trades: {len(rec)}")
+    print(f"Final equity: ${eq:.2f}  Total trades: {len(rec)}  Trades/day: {tpd:.2f}")
     os.makedirs(ODIR,exist_ok=True)
     yr={}
     for r in rec:yr.setdefault(r[0].year,[]).append(r)
@@ -173,20 +235,23 @@ def main():
                 w.writerow([r[0].strftime('%Y-%m-%d %H:%M'),r[1].strftime('%Y-%m-%d %H:%M'),r[2],round(r[3],2),round(r[4],2),round(r[5],4),r[6]])
         tot=sum(r[5] for r in rs);wn=sum(1 for r in rs if r[5]>0)
         ls=len(rs)-wn;cum+=tot
-        summ.append([y,len(rs),wn,ls,round(tot,2),round(cum,2),round(wn/len(rs)*100,1) if rs else 0])
+        days=set((r[0].year,r[0].month,r[0].day) for r in rs)
+        tpd_y=len(rs)/max(len(days),1)
+        summ.append([y,len(rs),wn,ls,round(tot,2),round(cum,2),round(wn/len(rs)*100,1) if rs else 0,round(tpd_y,2)])
     with open(f"{ODIR}/summary.csv",'w',newline='') as f:
         w=csv.writer(f)
-        w.writerow(['Year','Trades','Wins','Losses','Profit$','Equity$','WinRate%'])
+        w.writerow(['Year','Trades','Wins','Losses','Profit$','Equity$','WinRate%','Trades/Day'])
         w.writerows(summ)
     with open(f"{ODIR}/best_params.csv",'w',newline='') as f:
         w=csv.writer(f);w.writerow(['Param','Value'])
         for k,v in p.items():w.writerow([k,v])
         w.writerow(['Capital',CAP]);w.writerow(['Lot',LOT]);w.writerow(['Spread',SPR])
         w.writerow(['FinalEquity',round(eq,2)]);w.writerow(['TotalTrades',len(rec)])
+        w.writerow(['TradesPerDay',round(tpd,2)])
     print("\nYearly summary:")
-    print(f"{'Year':6}{'Trades':>8}{'Wins':>6}{'Loss':>6}{'Profit$':>10}{'Equity$':>10}{'WR%':>6}")
+    print(f"{'Year':6}{'Trades':>8}{'Wins':>6}{'Loss':>6}{'Profit$':>10}{'Equity$':>10}{'WR%':>6}{'T/D':>6}")
     for r in summ:
-        print(f"{r[0]:<6}{r[1]:>8}{r[2]:>6}{r[3]:>6}{r[4]:>+10.2f}{r[5]:>10.2f}{r[6]:>6.1f}")
+        print(f"{r[0]:<6}{r[1]:>8}{r[2]:>6}{r[3]:>6}{r[4]:>+10.2f}{r[5]:>10.2f}{r[6]:>6.1f}{r[7]:>6.2f}")
     print(f"\nResults saved in {ODIR}/")
 
 if __name__=='__main__':main()
