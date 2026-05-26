@@ -1,0 +1,420 @@
+//@version=5
+indicator("TH02 — Price Time Dilation (Squeeze Breakout)",
+          overlay          = true,
+          format           = format.price,
+          precision        = 4,
+          max_lines_count  = 500,
+          max_labels_count = 500,
+          max_boxes_count  = 500)
+
+// ============================================================
+// === 1) CALCULATION PERIODS =================================
+// ============================================================
+g1 = "1) Calculation Periods"
+atr_period   = input.int(14, "ATR Period",           minval = 1, group = g1)
+atr_lookback = input.int(50, "ATR Lookback (avg)",   minval = 2, group = g1)
+vol_period   = input.int(50, "Volume SMA Period",    minval = 2, group = g1)
+sq_bars      = input.int(8,  "Squeeze Channel Bars", minval = 2, group = g1)
+
+// ============================================================
+// === 2) THRESHOLDS ==========================================
+// ============================================================
+g2 = "2) Thresholds"
+atr_thresh      = input.float(0.7,  "ATR Ratio Max (compression)", minval = 0.1,  maxval = 2.0, step = 0.05, group = g2)
+vol_thresh      = input.float(1.5,  "Volume Ratio Min",            minval = 0.5,  maxval = 5.0, step = 0.1,  group = g2)
+sq_score_thresh = input.float(0.45, "Squeeze Score Min",           minval = 0.05, step = 0.05,              group = g2)
+strict_mode     = input.bool(false, "Strict Mode (require ALL 3 thresholds)", group = g2)
+
+// ============================================================
+// === 3) RISK MANAGEMENT =====================================
+// ============================================================
+g3 = "3) Risk Management"
+tp_pips  = input.float(60,   "TP (pips)", minval = 1, group = g3)
+sl_pips  = input.float(25,   "SL (pips)", minval = 1, group = g3)
+pip_size = input.float(0.10, "Pip Size",  minval = 0.0001, step = 0.001, group = g3,
+                        tooltip = "XAUUSD=0.10 | EURUSD=0.0001 | USDJPY=0.01")
+
+// ============================================================
+// === 4) DISPLAY & BOXES =====================================
+// ============================================================
+g4 = "4) Display & Boxes"
+show_zone           = input.bool(true,  "Show Squeeze Zone (lines)", group = g4)
+show_signals        = input.bool(true,  "Show Breakout Arrows",      group = g4)
+show_boxes          = input.bool(true,  "Show Entry/TP/SL Boxes",    group = g4)
+show_table          = input.bool(true,  "Show Status Table",         group = g4)
+show_bg             = input.bool(true,  "Tint Chart BG on Squeeze",  group = g4)
+tpsl_bars           = input.int(20, "Box Width (bars forward)",                    minval = 5, maxval = 200, group = g4)
+box_alpha           = input.int(70, "Box Transparency (0=solid, 100=invisible)",   minval = 0, maxval = 100, group = g4)
+border_alpha_offset = input.int(30, "Border Solidity Offset",                      minval = 0, maxval = 80,  group = g4)
+max_box_sets        = input.int(30, "Max Recent Box Sets to Keep",                 minval = 1, maxval = 100, group = g4)
+match_tpsl_height   = input.bool(true, "Match TP/SL height to Entry zone", group = g4)
+tpsl_thin_pips      = input.float(5, "Thin Band Height in pips (when above is OFF)", minval = 1, group = g4)
+
+// ============================================================
+// === 5) DRAWING SIZE CONTROL ================================
+// ============================================================
+g_size = "5) Drawing Size Control"
+size_preset     = input.string("Large", "★ Master Drawing Size",
+                                options = ["Compact", "Normal", "Large", "Huge"],
+                                group = g_size,
+                                tooltip = "Master scale for all visuals. Override individual items below.")
+zone_line_w_in  = input.int(0, "Zone Line Width (0=auto)",       minval = 0, maxval = 10, group = g_size)
+box_border_w_in = input.int(0, "Box Border Width (0=auto)",      minval = 0, maxval = 10, group = g_size)
+monitor_w_in    = input.int(0, "Monitor Line Width (0=auto)",    minval = 0, maxval = 10, group = g_size)
+arrow_size_in   = input.string("auto", "BUY/SELL Arrow Size",
+                                options = ["auto", "tiny", "small", "normal", "large", "huge"],
+                                group = g_size)
+label_size_in   = input.string("auto", "TP/SL/ENTRY Label Size",
+                                options = ["auto", "tiny", "small", "normal", "large", "huge"],
+                                group = g_size)
+table_size_in   = input.string("auto", "Status Table Text Size",
+                                options = ["auto", "tiny", "small", "normal", "large", "huge"],
+                                group = g_size)
+
+// === Resolve preset → numeric/size values via switch (clean type handling) ===
+preset_zone_w = switch size_preset
+    "Compact" => 2
+    "Normal"  => 3
+    "Large"   => 4
+    => 6
+
+preset_box_w = switch size_preset
+    "Compact" => 1
+    "Normal"  => 2
+    "Large"   => 3
+    => 5
+
+preset_mon_w = switch size_preset
+    "Compact" => 1
+    "Normal"  => 2
+    "Large"   => 3
+    => 5
+
+preset_arrow = switch size_preset
+    "Compact" => size.tiny
+    "Normal"  => size.small
+    "Large"   => size.large
+    => size.huge
+
+preset_label = switch size_preset
+    "Compact" => size.tiny
+    "Normal"  => size.small
+    "Large"   => size.normal
+    => size.large
+
+preset_table = switch size_preset
+    "Compact" => size.tiny
+    "Normal"  => size.small
+    "Large"   => size.normal
+    => size.large
+
+// === Resolve final values (override > preset) ===
+zone_line_w  = zone_line_w_in  > 0 ? zone_line_w_in  : preset_zone_w
+box_border_w = box_border_w_in > 0 ? box_border_w_in : preset_box_w
+monitor_w    = monitor_w_in    > 0 ? monitor_w_in    : preset_mon_w
+
+arrow_sz = switch arrow_size_in
+    "tiny"   => size.tiny
+    "small"  => size.small
+    "normal" => size.normal
+    "large"  => size.large
+    "huge"   => size.huge
+    => preset_arrow
+
+label_sz = switch label_size_in
+    "tiny"   => size.tiny
+    "small"  => size.small
+    "normal" => size.normal
+    "large"  => size.large
+    "huge"   => size.huge
+    => preset_label
+
+table_sz = switch table_size_in
+    "tiny"   => size.tiny
+    "small"  => size.small
+    "normal" => size.normal
+    "large"  => size.large
+    "huge"   => size.huge
+    => preset_table
+
+// ============================================================
+// === 6) MONITORING LINE =====================================
+// ============================================================
+g6 = "6) Monitoring Line"
+show_monitor        = input.bool(true,  "Show Monitoring Line", group = g6)
+monitor_offset_pips = input.float(20, "Offset (pips above current price)", minval = 0.1, step = 0.5, group = g6)
+monitor_color       = input.color(color.blue, "Line Color", group = g6)
+monitor_show_label  = input.bool(true, "Show Price Label", group = g6)
+
+// ============================================================
+// === CALCULATIONS ===========================================
+// ============================================================
+atr_val   = ta.atr(atr_period)
+atr_avg   = ta.sma(atr_val, atr_lookback)
+atr_ratio = atr_avg > 0 ? atr_val / atr_avg : 1.0
+
+vol_avg   = ta.sma(volume, vol_period)
+vol_ratio = vol_avg > 0 ? volume / vol_avg : 1.0
+
+sq_score  = math.max(0, (1 - atr_ratio)) * vol_ratio
+
+score_ok  = sq_score   > sq_score_thresh
+atr_ok    = atr_ratio  < atr_thresh
+vol_ok    = vol_ratio  > vol_thresh
+sq_active = strict_mode ? (score_ok and atr_ok and vol_ok) : score_ok
+
+highest_N = ta.highest(high, sq_bars)
+lowest_N  = ta.lowest(low,  sq_bars)
+
+breakout_up   = close > highest_N[1] and sq_active
+breakout_down = close < lowest_N[1]  and sq_active
+
+breakout_up_first   = breakout_up   and not breakout_up[1]
+breakout_down_first = breakout_down and not breakout_down[1]
+
+// ============================================================
+// === DATA WINDOW VALUES (hidden from chart) =================
+// ============================================================
+plot(sq_score,  "Squeeze Score", color = color.green,  display = display.data_window)
+plot(atr_ratio, "ATR Ratio",     color = color.blue,   display = display.data_window)
+plot(vol_ratio, "Vol Ratio",     color = color.orange, display = display.data_window)
+
+// ============================================================
+// === BACKGROUND TINT (chart-wide on squeeze) ================
+// ============================================================
+bgcolor(show_bg and sq_active ? color.new(color.yellow, 92) : na, title = "Squeeze BG")
+
+// ============================================================
+// === SQUEEZE ZONE LINES =====================================
+// ============================================================
+plot(show_zone and sq_active ? highest_N : na, "Zone High",
+     color = color.new(color.gray, 20), linewidth = zone_line_w, style = plot.style_linebr)
+plot(show_zone and sq_active ? lowest_N  : na, "Zone Low",
+     color = color.new(color.gray, 20), linewidth = zone_line_w, style = plot.style_linebr)
+
+// ============================================================
+// === BREAKOUT ARROWS ========================================
+// ============================================================
+plotshape(show_signals and breakout_up_first, "BUY Signal",
+          style = shape.triangleup, location = location.belowbar,
+          color = color.new(color.green, 0), size = arrow_sz,
+          text = "BUY", textcolor = color.white)
+plotshape(show_signals and breakout_down_first, "SELL Signal",
+          style = shape.triangledown, location = location.abovebar,
+          color = color.new(color.red, 0), size = arrow_sz,
+          text = "SELL", textcolor = color.white)
+
+// ============================================================
+// === ENTRY / TP / SL BOXES ==================================
+// ============================================================
+var array<box>   entry_boxes = array.new<box>()
+var array<box>   tp_boxes    = array.new<box>()
+var array<box>   sl_boxes    = array.new<box>()
+var array<label> tpsl_labels = array.new<label>()
+
+tp_dist      = tp_pips * pip_size
+sl_dist      = sl_pips * pip_size
+border_alpha = math.max(0, box_alpha - border_alpha_offset)
+min_height   = tpsl_thin_pips * pip_size
+
+// === BUY signal ===
+if show_boxes and breakout_up_first
+    entry_h      = high
+    entry_l      = low
+    entry_height = entry_h - entry_l
+    
+    // defensive: ensure visible height even on doji bars
+    tpsl_h_raw = match_tpsl_height ? entry_height : min_height
+    tpsl_h     = math.max(tpsl_h_raw, min_height)
+    half_h     = tpsl_h / 2
+    
+    // Entry zone — gray box covering breakout candle's H-L
+    eb = box.new(bar_index, entry_h, bar_index + tpsl_bars, entry_l,
+                 bgcolor      = color.new(color.gray, box_alpha),
+                 border_color = color.new(color.gray, border_alpha),
+                 border_width = box_border_w,
+                 text         = "ENTRY",
+                 text_color   = color.white,
+                 text_size    = label_sz,
+                 text_halign  = text.align_left,
+                 text_valign  = text.align_center)
+    
+    // TP box — green at (close + tp_dist)
+    tp_price = close + tp_dist
+    tb = box.new(bar_index, tp_price + half_h, bar_index + tpsl_bars, tp_price - half_h,
+                 bgcolor      = color.new(color.green, box_alpha),
+                 border_color = color.new(color.green, border_alpha),
+                 border_width = box_border_w)
+    
+    // SL box — red at (close - sl_dist)
+    sl_price = close - sl_dist
+    sb = box.new(bar_index, sl_price + half_h, bar_index + tpsl_bars, sl_price - half_h,
+                 bgcolor      = color.new(color.red, box_alpha),
+                 border_color = color.new(color.red, border_alpha),
+                 border_width = box_border_w)
+    
+    lt = label.new(bar_index + tpsl_bars, tp_price, " TP " + str.tostring(tp_pips, "#") + "p ",
+                   color     = color.new(color.green, 30),
+                   textcolor = color.white,
+                   style     = label.style_label_left,
+                   size      = label_sz)
+    ls = label.new(bar_index + tpsl_bars, sl_price, " SL " + str.tostring(sl_pips, "#") + "p ",
+                   color     = color.new(color.red, 30),
+                   textcolor = color.white,
+                   style     = label.style_label_left,
+                   size      = label_sz)
+    
+    array.push(entry_boxes, eb)
+    array.push(tp_boxes,    tb)
+    array.push(sl_boxes,    sb)
+    array.push(tpsl_labels, lt)
+    array.push(tpsl_labels, ls)
+    
+    while array.size(entry_boxes) > max_box_sets
+        box.delete(array.shift(entry_boxes))
+        box.delete(array.shift(tp_boxes))
+        box.delete(array.shift(sl_boxes))
+    while array.size(tpsl_labels) > max_box_sets * 2
+        label.delete(array.shift(tpsl_labels))
+
+// === SELL signal ===
+if show_boxes and breakout_down_first
+    entry_h      = high
+    entry_l      = low
+    entry_height = entry_h - entry_l
+    
+    tpsl_h_raw = match_tpsl_height ? entry_height : min_height
+    tpsl_h     = math.max(tpsl_h_raw, min_height)
+    half_h     = tpsl_h / 2
+    
+    eb = box.new(bar_index, entry_h, bar_index + tpsl_bars, entry_l,
+                 bgcolor      = color.new(color.gray, box_alpha),
+                 border_color = color.new(color.gray, border_alpha),
+                 border_width = box_border_w,
+                 text         = "ENTRY",
+                 text_color   = color.white,
+                 text_size    = label_sz,
+                 text_halign  = text.align_left,
+                 text_valign  = text.align_center)
+    
+    // TP price BELOW entry for SELL
+    tp_price = close - tp_dist
+    tb = box.new(bar_index, tp_price + half_h, bar_index + tpsl_bars, tp_price - half_h,
+                 bgcolor      = color.new(color.green, box_alpha),
+                 border_color = color.new(color.green, border_alpha),
+                 border_width = box_border_w)
+    
+    // SL price ABOVE entry for SELL
+    sl_price = close + sl_dist
+    sb = box.new(bar_index, sl_price + half_h, bar_index + tpsl_bars, sl_price - half_h,
+                 bgcolor      = color.new(color.red, box_alpha),
+                 border_color = color.new(color.red, border_alpha),
+                 border_width = box_border_w)
+    
+    lt = label.new(bar_index + tpsl_bars, tp_price, " TP " + str.tostring(tp_pips, "#") + "p ",
+                   color     = color.new(color.green, 30),
+                   textcolor = color.white,
+                   style     = label.style_label_left,
+                   size      = label_sz)
+    ls = label.new(bar_index + tpsl_bars, sl_price, " SL " + str.tostring(sl_pips, "#") + "p ",
+                   color     = color.new(color.red, 30),
+                   textcolor = color.white,
+                   style     = label.style_label_left,
+                   size      = label_sz)
+    
+    array.push(entry_boxes, eb)
+    array.push(tp_boxes,    tb)
+    array.push(sl_boxes,    sb)
+    array.push(tpsl_labels, lt)
+    array.push(tpsl_labels, ls)
+    
+    while array.size(entry_boxes) > max_box_sets
+        box.delete(array.shift(entry_boxes))
+        box.delete(array.shift(tp_boxes))
+        box.delete(array.shift(sl_boxes))
+    while array.size(tpsl_labels) > max_box_sets * 2
+        label.delete(array.shift(tpsl_labels))
+
+// ============================================================
+// === MONITORING LINE ========================================
+// ============================================================
+var line  monitor_line  = na
+var label monitor_label = na
+
+if show_monitor
+    monitor_y = close + monitor_offset_pips * pip_size
+    
+    if na(monitor_line)
+        monitor_line := line.new(bar_index, monitor_y,
+                                  bar_index + 1, monitor_y,
+                                  color  = monitor_color,
+                                  width  = monitor_w,
+                                  style  = line.style_dashed,
+                                  extend = extend.right)
+    else
+        line.set_xy1(monitor_line, bar_index, monitor_y)
+        line.set_xy2(monitor_line, bar_index + 1, monitor_y)
+        line.set_color(monitor_line, monitor_color)
+        line.set_width(monitor_line, monitor_w)
+    
+    if monitor_show_label
+        lbl_text = "Watch +" + str.tostring(monitor_offset_pips, "#.#") + "p (" + str.tostring(monitor_y, format.mintick) + ")"
+        if na(monitor_label)
+            monitor_label := label.new(bar_index + 1, monitor_y, lbl_text,
+                                        color     = color.new(monitor_color, 50),
+                                        textcolor = color.white,
+                                        style     = label.style_label_left,
+                                        size      = label_sz)
+        else
+            label.set_xy(monitor_label, bar_index + 1, monitor_y)
+            label.set_text(monitor_label, lbl_text)
+            label.set_color(monitor_label, color.new(monitor_color, 50))
+            label.set_size(monitor_label, label_sz)
+    else
+        if not na(monitor_label)
+            label.delete(monitor_label)
+            monitor_label := na
+else
+    if not na(monitor_line)
+        line.delete(monitor_line)
+        monitor_line := na
+    if not na(monitor_label)
+        label.delete(monitor_label)
+        monitor_label := na
+
+// ============================================================
+// === STATUS TABLE ===========================================
+// ============================================================
+var table tbl = table.new(position.top_right, 2, 5,
+                           bgcolor      = color.new(color.black, 70),
+                           border_width = 2,
+                           border_color = color.gray)
+
+if show_table and barstate.islast
+    table.cell(tbl, 0, 0, "Metric", text_color = color.white, bgcolor = color.new(color.blue, 50), text_size = table_sz)
+    table.cell(tbl, 1, 0, "Value",  text_color = color.white, bgcolor = color.new(color.blue, 50), text_size = table_sz)
+    table.cell(tbl, 0, 1, "ATR Ratio", text_color = color.white, text_size = table_sz)
+    table.cell(tbl, 1, 1, str.tostring(atr_ratio, "#.##"),
+               text_color = atr_ratio < atr_thresh ? color.green : color.red,
+               text_size  = table_sz)
+    table.cell(tbl, 0, 2, "Vol Ratio", text_color = color.white, text_size = table_sz)
+    table.cell(tbl, 1, 2, str.tostring(vol_ratio, "#.##"),
+               text_color = vol_ratio > vol_thresh ? color.green : color.red,
+               text_size  = table_sz)
+    table.cell(tbl, 0, 3, "Sq Score", text_color = color.white, text_size = table_sz)
+    table.cell(tbl, 1, 3, str.tostring(sq_score, "#.##"),
+               text_color = sq_score > sq_score_thresh ? color.green : color.red,
+               text_size  = table_sz)
+    table.cell(tbl, 0, 4, "Status", text_color = color.white, text_size = table_sz)
+    table.cell(tbl, 1, 4, sq_active ? "ACTIVE" : "—",
+               text_color = sq_active ? color.green : color.gray,
+               bgcolor    = sq_active ? color.new(color.green, 70) : na,
+               text_size  = table_sz)
+
+// ============================================================
+// === ALERTS =================================================
+// ============================================================
+alertcondition(breakout_up_first,   title = "TH02 BUY",
+               message = "TH02 BUY — Squeeze Breakout Up on {{ticker}} {{interval}} @ {{close}}")
+alertcondition(breakout_down_first, title = "TH02 SELL",
+               message = "TH02 SELL — Squeeze Breakout Down on {{ticker}} {{interval}} @ {{close}}")
