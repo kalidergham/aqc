@@ -1,0 +1,6 @@
+Verdict: OVERFIT: OOS losing — strategy doesn't generalize
+In-Sample: 6/8 years +, $+88.07
+Out-Sample: 1/3 years +, $-103.82
+Avg trades/day: 0.22
+Final equity: $84.24
+Best params: {'LBH': 256, 'LBM': 128, 'MNH': 4, 'MXH': 120, 'MNM': 8, 'MXM': 60, 'SH': 2.5, 'SM': 3.0, 'EF': 12, 'ES': 200, 'AP': 7, 'TPM': 3.0, 'SLM': 1.5, 'ED': 0.1, 'ST': 2, 'MP': 10, 'SD': 50, 'AL': 400, 'ALO': 0.4, 'AHI': 3.0}
