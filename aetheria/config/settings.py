@@ -32,11 +32,11 @@ APP_VERSION: str = "1.0.0"
 # توكن البوت من BotFather. الأفضل ضبطه عبر متغيّر البيئة AETHERIA_TG_TOKEN.
 TELEGRAM_TOKEN: str = os.getenv(
     "AETHERIA_TG_TOKEN",
-    "PUT_YOUR_TELEGRAM_BOT_TOKEN_HERE",  # placeholder — غيّره أو استخدم env
+    "8634789358:AAFBFxlcxacJpjCG3XgWfzs_tQANPaf2lgQ",  # placeholder — غيّره أو استخدم env
 )
 
 # معرّف محادثة المدير (لاستقبال تنبيهات الأخطاء والإشارات). 0 = غير محدد.
-ADMIN_CHAT_ID: int = int(os.getenv("AETHERIA_ADMIN_CHAT_ID", "0"))
+ADMIN_CHAT_ID: int = int(os.getenv("6521892266", "0"))
 
 # نمط تنسيق الرسائل الافتراضي ("Markdown" / "HTML" / None).
 TELEGRAM_PARSE_MODE: str = "Markdown"
