@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# بيئات افتراضية
+.venv/
+venv/
+env/
+
+# أسرار وإعدادات محلية
+.env
+*.local
+
+# سجلّات
+*.log

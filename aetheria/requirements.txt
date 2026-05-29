@@ -1,0 +1,17 @@
+# متطلبات بوت أثيريا (Aetheria v1)
+# ملاحظة: كل المكتبات متوافقة مع Termux (Linux/Android) ولا تتطلب compilation ثقيل.
+# (تم تجنّب ta-lib عمداً واستبدالها بحسابات pandas/numpy يدوية).
+
+# --- واجهة Telegram ---
+pyTelegramBotAPI>=4.14.0      # telebot: الأزرار التفاعلية InlineKeyboardMarkup
+
+# --- التحليل الكمي ---
+pandas>=2.0.0                 # معالجة البيانات السعرية (DataFrame)
+numpy>=1.24.0                 # العمليات الرياضية المتجهة (vectorized)
+
+# --- الشبكة والبيانات ---
+requests>=2.31.0              # جلب ملفات CSV من GitHub
+
+# --- منصة التداول (اختياري للتداول اللحظي فقط) ---
+# MetaApi SDK يعمل على Linux/Termux (بخلاف مكتبة MetaTrader5 الرسمية).
+metaapi-cloud-sdk>=27.0.0
