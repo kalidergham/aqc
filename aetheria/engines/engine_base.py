@@ -144,6 +144,31 @@ class EngineBase(ABC):
         """
         raise NotImplementedError
 
+    # ------------------- خطّافات الباكتيست (Backtest Hooks) ----------------- #
+    # هذه الدوال تتيح لمحرك الباكتيست إعادة استخدام منطق المحرك شمعةً بشمعة
+    # دون تكرار الكود. كل محرك فعلي يتجاوزها.
+    def compute_indicators(self, df: "pd.DataFrame") -> "pd.DataFrame":
+        """حساب كل المؤشرات وإلحاقها كأعمدة (يتجاوزه المحرك الفعلي)."""
+        raise NotImplementedError("compute_indicators غير مُنفّذة في هذا المحرك.")
+
+    def generate_entry(self, row: Any) -> Optional[SignalType]:
+        """
+        تقييم صفّ مؤشرات واحد (مُحسوب مسبقاً) وإرجاع نوع الدخول.
+
+        Returns:
+            SignalType.BUY / SignalType.SELL عند توفّر الشرط، أو None.
+        """
+        raise NotImplementedError("generate_entry غير مُنفّذة في هذا المحرك.")
+
+    def compute_sl_tp(self, side: SignalType, entry: float, row: Any) -> tuple:
+        """
+        حساب (SL, TP) لصفقة بناءً على صفّ المؤشرات (ATR وغيره).
+
+        Returns:
+            (sl, tp) كقيمتين float.
+        """
+        raise NotImplementedError("compute_sl_tp غير مُنفّذة في هذا المحرك.")
+
     # --------------------------- منطق مشترك مساعد -------------------------- #
     def validate_data(self, df: "pd.DataFrame") -> bool:
         """

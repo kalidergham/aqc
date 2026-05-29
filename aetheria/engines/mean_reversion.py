@@ -21,26 +21,20 @@ engines/mean_reversion.py
 • Bollinger Bands (المرجع: John Bollinger, 1980s):
       MB    = SMA(close, N)
       σ     = الانحراف المعياري للسعر خلال N (population, ddof=0)
-      Upper = MB + k·σ
-      Lower = MB − k·σ
+      Upper = MB + k·σ ,  Lower = MB − k·σ
       %B    = (close − Lower) / (Upper − Lower)
 
 • RSI (المرجع: J. Welles Wilder, 1978):
-      ΔP        = close.diff()
-      Gain      = max(ΔP, 0) ,  Loss = max(−ΔP, 0)
-      AvgGain   = RMA(Gain, N)   (تنعيم وايلدر: α = 1/N)
-      AvgLoss   = RMA(Loss, N)
-      RS        = AvgGain / AvgLoss
-      RSI       = 100 − 100 / (1 + RS)
+      AvgGain = RMA(max(ΔP,0), N) ,  AvgLoss = RMA(max(−ΔP,0), N)
+      RS = AvgGain / AvgLoss ,  RSI = 100 − 100 / (1 + RS)
 
 • ATR (المرجع: Wilder, 1978):
-      TR  = max(High−Low, |High−prevClose|, |Low−prevClose|)
-      ATR = RMA(TR, N)
+      TR = max(High−Low, |High−prevClose|, |Low−prevClose|) ,  ATR = RMA(TR, N)
 
 منطق الإشارة
 ------------
-    BUY  : close ≤ LowerBand  و  RSI ≤ oversold   (تشبّع بيعي + تمدّد سفلي)
-    SELL : close ≥ UpperBand  و  RSI ≥ overbought (تشبّع شرائي + تمدّد علوي)
+    BUY  : close ≤ LowerBand  و  RSI ≤ oversold
+    SELL : close ≥ UpperBand  و  RSI ≥ overbought
     HOLD : غير ذلك.
 الهدف (TP) = العودة إلى المتوسط (MB)، ووقف الخسارة (SL) = ATR ديناميكي،
 مع فرض حدّ أدنى لنسبة العائد/المخاطرة (R:R).
@@ -49,7 +43,7 @@ engines/mean_reversion.py
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -65,13 +59,8 @@ class MeanReversionEngine(EngineBase):
     محرك الارتداد للمتوسط (Bollinger Bands + RSI) مع SL/TP ديناميكي بالـ ATR.
 
     Attributes:
-        bb_period     : فترة متوسط بولينجر.
-        bb_std        : عدد الانحرافات المعيارية للنطاقات.
-        rsi_period    : فترة RSI.
-        rsi_oversold  : حد التشبّع البيعي (إشارة شراء).
-        rsi_overbought: حد التشبّع الشرائي (إشارة بيع).
-        atr_period    : فترة ATR لإدارة المخاطر.
-        symbol        : رمز الزوج (افتراضياً من الإعدادات).
+        bb_period, bb_std, rsi_period, rsi_oversold, rsi_overbought, atr_period
+        symbol: رمز الزوج (افتراضياً من الإعدادات).
     """
 
     def __init__(
@@ -109,17 +98,12 @@ class MeanReversionEngine(EngineBase):
 
     @property
     def version(self) -> str:
-        return "1.0.0"
+        return "1.1.0"
 
     # ----------------------------- حساب المؤشرات --------------------------- #
     @staticmethod
     def _rma(series: "pd.Series", period: int) -> "pd.Series":
-        """
-        متوسط وايلدر المتحرك (Wilder's RMA) — أساس RSI و ATR.
-
-        يكافئ تنعيماً أسياً بمعامل α = 1/period (مع adjust=False ليطابق
-        صيغة وايلدر الأصلية تماماً).
-        """
+        """متوسط وايلدر المتحرك (RMA) — أساس RSI و ATR (α = 1/period)."""
         return series.ewm(alpha=1.0 / period, adjust=False).mean()
 
     def _rsi(self, close: "pd.Series") -> "pd.Series":
@@ -132,27 +116,21 @@ class MeanReversionEngine(EngineBase):
         # نتجنّب القسمة على صفر: حيث avg_loss=0 يكون RSI=100.
         rs = avg_gain / avg_loss.replace(0.0, np.nan)
         rsi = 100.0 - (100.0 / (1.0 + rs))
-        return rsi.fillna(100.0)              # لا خسائر ⇒ تشبّع شرائي تام
+        return rsi.fillna(100.0)
 
     def _atr(self, df: "pd.DataFrame") -> "pd.Series":
         """حساب المدى الحقيقي المتوسط ATR (تقلّب السوق)."""
         high, low, close = df["high"], df["low"], df["close"]
         prev_close = close.shift(1)
-        # المدى الحقيقي TR = أكبر القيم الثلاث.
         tr = pd.concat(
-            [
-                (high - low),
-                (high - prev_close).abs(),
-                (low - prev_close).abs(),
-            ],
+            [(high - low), (high - prev_close).abs(), (low - prev_close).abs()],
             axis=1,
         ).max(axis=1)
         return self._rma(tr, self.atr_period)
 
     def compute_indicators(self, df: "pd.DataFrame") -> "pd.DataFrame":
         """
-        حساب كل المؤشرات وإلحاقها كأعمدة جديدة (دالة قابلة لإعادة الاستخدام
-        في محرك الباكتيست أيضاً).
+        حساب كل المؤشرات وإلحاقها كأعمدة جديدة (يُعاد استخدامها في الباكتيست).
 
         Returns:
             نسخة من df مضافاً إليها: mb, upper, lower, pct_b, rsi, atr.
@@ -162,11 +140,9 @@ class MeanReversionEngine(EngineBase):
 
         # --- Bollinger Bands ---
         out["mb"] = close.rolling(self.bb_period).mean()
-        # ddof=0 ⇒ انحراف معياري للمجتمع (يطابق صيغة بولينجر الشائعة).
-        sigma = close.rolling(self.bb_period).std(ddof=0)
+        sigma = close.rolling(self.bb_period).std(ddof=0)  # ddof=0 = انحراف المجتمع
         out["upper"] = out["mb"] + self.bb_std * sigma
         out["lower"] = out["mb"] - self.bb_std * sigma
-        # %B: موضع السعر داخل النطاق (0=عند السفلي، 1=عند العلوي).
         band_range = (out["upper"] - out["lower"]).replace(0.0, np.nan)
         out["pct_b"] = (close - out["lower"]) / band_range
 
@@ -175,17 +151,65 @@ class MeanReversionEngine(EngineBase):
         out["atr"] = self._atr(out)
         return out
 
+    # --------------------- خطّافات الباكتيست (مُعاد استخدامها) --------------- #
+    def generate_entry(self, row: Any) -> Optional[SignalType]:
+        """تقييم صفّ مؤشرات واحد وإرجاع BUY/SELL/None."""
+        try:
+            close = float(row["close"])
+            lower = float(row["lower"])
+            upper = float(row["upper"])
+            rsi = float(row["rsi"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        # تجاهل الصفوف التي لم تكتمل مؤشراتها بعد.
+        if any(np.isnan(v) for v in (lower, upper, rsi)):
+            return None
+        if close <= lower and rsi <= self.rsi_oversold:
+            return SignalType.BUY
+        if close >= upper and rsi >= self.rsi_overbought:
+            return SignalType.SELL
+        return None
+
+    def _sl_tp(
+        self, side: SignalType, entry: float, atr: float, mb: float
+    ) -> Tuple[float, float, bool]:
+        """
+        المنطق المشترك لحساب SL/TP (يُستخدم في التحليل الحي والباكتيست معاً).
+
+        Returns:
+            (sl, tp, high_vol) — high_vol يشير لكون السوق عالي التقلّب.
+        """
+        # مضاعف ATR يتغيّر حسب نظام التقلّب (النظرية 23).
+        high_vol = atr > (entry * 0.004)  # عتبة ~0.4% من السعر
+        mult = (
+            settings.ATR_SL_MULTIPLIER_HIGH_VOL if high_vol else settings.ATR_SL_MULTIPLIER
+        )
+        sl_dist = atr * mult
+        min_rr = settings.MIN_RISK_REWARD
+
+        if side == SignalType.BUY:
+            sl = entry - sl_dist
+            tp = mb  # الهدف: العودة إلى المتوسط
+            if (tp - entry) < min_rr * sl_dist:  # نضمن حدّ R:R الأدنى
+                tp = entry + min_rr * sl_dist
+        else:  # SELL
+            sl = entry + sl_dist
+            tp = mb
+            if (entry - tp) < min_rr * sl_dist:
+                tp = entry - min_rr * sl_dist
+        return sl, tp, high_vol
+
+    def compute_sl_tp(self, side: SignalType, entry: float, row: Any) -> Tuple[float, float]:
+        """خطّاف الباكتيست: يحسب (SL, TP) من صفّ المؤشرات."""
+        sl, tp, _ = self._sl_tp(side, entry, float(row["atr"]), float(row["mb"]))
+        return sl, tp
+
     # ------------------------------- التحليل ------------------------------- #
     def analyze(self, df: "pd.DataFrame") -> Dict[str, Any]:
         """
-        تحليل آخر شمعة وإصدار إشارة BUY/SELL/HOLD.
+        تحليل آخر شمعة وإصدار إشارة BUY/SELL/HOLD (للتداول الحي).
 
-        Args:
-            df: DataFrame بأعمدة open/high/low/close/volume وفهرس زمني.
-
-        Returns:
-            قاموس الإشارة الموحّد (Signal.to_dict()). لا يرفع استثناءً عند
-            خطأ منطقي بل يُرجع HOLD مع السبب (تحقيقاً لمعيار معالجة الأخطاء).
+        لا يرفع استثناءً عند خطأ بل يُرجع HOLD مع السبب.
         """
         try:
             self.validate_data(df)
@@ -200,33 +224,19 @@ class MeanReversionEngine(EngineBase):
             atr = float(last["atr"])
             pct_b = float(last["pct_b"])
 
-            # إن لم تكتمل المؤشرات بعد (NaN في بداية السلسلة) ⇒ انتظار.
             if any(np.isnan(v) for v in (mb, upper, lower, rsi, atr)):
                 return self.hold(self.symbol, "المؤشرات غير مكتملة بعد (بيانات قليلة).")
 
             indicators = {
-                "close": round(close, 3),
-                "mb": round(mb, 3),
-                "upper": round(upper, 3),
-                "lower": round(lower, 3),
-                "rsi": round(rsi, 2),
-                "atr": round(atr, 3),
-                "pct_b": round(pct_b, 3),
+                "close": round(close, 3), "mb": round(mb, 3),
+                "upper": round(upper, 3), "lower": round(lower, 3),
+                "rsi": round(rsi, 2), "atr": round(atr, 3), "pct_b": round(pct_b, 3),
             }
 
-            # ---------- شرط الشراء: تشبّع بيعي + لمس النطاق السفلي ----------
-            if close <= lower and rsi <= self.rsi_oversold:
-                return self._build_signal(
-                    SignalType.BUY, close, mb, atr, rsi, pct_b, indicators
-                )
+            side = self.generate_entry(last)
+            if side is not None:
+                return self._build_signal(side, close, mb, atr, rsi, pct_b, indicators)
 
-            # ---------- شرط البيع: تشبّع شرائي + لمس النطاق العلوي ----------
-            if close >= upper and rsi >= self.rsi_overbought:
-                return self._build_signal(
-                    SignalType.SELL, close, mb, atr, rsi, pct_b, indicators
-                )
-
-            # ---------- غير ذلك: انتظار ----------
             sig = self.hold(self.symbol, "لا تشبّع/تمدّد كافٍ للدخول.")
             sig["indicators"] = indicators
             return sig
@@ -245,32 +255,10 @@ class MeanReversionEngine(EngineBase):
         pct_b: float,
         indicators: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """
-        بناء إشارة قابلة للتنفيذ مع SL ديناميكي (ATR) و TP نحو المتوسط،
-        مع فرض حدّ أدنى لنسبة العائد/المخاطرة (R:R).
-        """
-        # مضاعف ATR يتغيّر حسب نظام التقلّب (النظرية 23):
-        # نعتبر السوق "عالي التقلّب" إذا تجاوز ATR نسبة من السعر.
-        high_vol = atr > (entry * 0.004)  # ~0.4% من السعر كعتبة تقريبية
-        mult = (
-            settings.ATR_SL_MULTIPLIER_HIGH_VOL if high_vol else settings.ATR_SL_MULTIPLIER
-        )
-        sl_dist = atr * mult
-        min_rr = settings.MIN_RISK_REWARD
+        """بناء إشارة كاملة قابلة للتنفيذ (SL/TP + ثقة + سبب)."""
+        sl, tp, high_vol = self._sl_tp(side, entry, atr, mb)
 
-        if side == SignalType.BUY:
-            sl = entry - sl_dist
-            tp = mb  # الهدف: العودة إلى المتوسط
-            # نضمن أن يحقق الهدف حدّ R:R الأدنى، وإلا نمدّده.
-            if (tp - entry) < min_rr * sl_dist:
-                tp = entry + min_rr * sl_dist
-        else:  # SELL
-            sl = entry + sl_dist
-            tp = mb
-            if (entry - tp) < min_rr * sl_dist:
-                tp = entry - min_rr * sl_dist
-
-        # المسافات بالنقاط (pips) للعرض والتحقق من حدود الهدف.
+        # المسافات بالنقاط (pips) للعرض.
         tp_pips = abs(tp - entry) / settings.PIP_SIZE
         sl_pips = abs(entry - sl) / settings.PIP_SIZE
 
@@ -283,7 +271,9 @@ class MeanReversionEngine(EngineBase):
                 0.0, (rsi - self.rsi_overbought) / max(100 - self.rsi_overbought, 1)
             )
             band_strength = float(np.clip(pct_b - 1.0, 0.0, 1.0))  # %B>1 = فوق العلوي
-        confidence = float(np.clip(0.5 + 0.45 * (0.5 * rsi_strength + 0.5 * band_strength), 0.5, 0.95))
+        confidence = float(
+            np.clip(0.5 + 0.45 * (0.5 * rsi_strength + 0.5 * band_strength), 0.5, 0.95)
+        )
 
         reason = (
             f"{'تشبّع بيعي' if side == SignalType.BUY else 'تشبّع شرائي'} "
@@ -318,15 +308,12 @@ if __name__ == "__main__":
     print("اختبار MeanReversionEngine على بيانات وهمية (dummy data)")
     print("=" * 60)
 
-    # نولّد سلسلة سعرية وهمية: اتجاه جيبي (mean-reverting) + ضوضاء عشوائية.
     rng = np.random.default_rng(42)
     n = 300
     t = np.arange(n)
     base = 2300 + 40 * np.sin(2 * np.pi * t / 50)          # موجة حول 2300
     noise = rng.normal(0, 5, n).cumsum() * 0.3             # ضوضاء ممشّاة
     close = base + noise
-
-    # بناء OHLC منطقي حول سعر الإغلاق.
     high = close + rng.uniform(1, 6, n)
     low = close - rng.uniform(1, 6, n)
     open_ = close + rng.uniform(-3, 3, n)
@@ -339,26 +326,19 @@ if __name__ == "__main__":
     )
 
     engine = MeanReversionEngine()
-    print(f"\nالمحرك: {engine!r}")
-    print(f"الحد الأدنى للصفوف: {engine.min_rows}")
+    print(f"\nالمحرك: {engine!r} | min_rows={engine.min_rows}")
 
-    # 1) إشارة على آخر شمعة من البيانات الوهمية.
     result = engine.analyze(dummy)
     print("\n--- نتيجة التحليل على آخر شمعة ---")
     for k, v in result.items():
         print(f"  {k}: {v}")
 
-    # 2) اختبار حالة شراء مفتعَلة (سعر منخفض جداً ⇒ تشبّع بيعي).
+    # اختبار حالة شراء مفتعَلة (تشبّع بيعي).
     forced = dummy.copy()
     forced.iloc[-1, forced.columns.get_loc("close")] = float(forced["low"].min()) - 50
     forced.iloc[-1, forced.columns.get_loc("low")] = float(forced["low"].min()) - 55
     buy_test = engine.analyze(forced)
     print("\n--- اختبار حالة شراء مفتعلة ---")
     print(f"  الإشارة: {buy_test['signal']} | السبب: {buy_test['reason']}")
-
-    # 3) فحص المؤشرات الأخيرة للتأكد من صحة الحساب.
-    ind = engine.compute_indicators(dummy)
-    print("\n--- آخر 3 صفوف من المؤشرات ---")
-    print(ind[["close", "mb", "upper", "lower", "rsi", "atr", "pct_b"]].tail(3).round(2))
 
     print("\n✅ انتهى الاختبار بنجاح.")

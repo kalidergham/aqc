@@ -1,115 +1,129 @@
-# 🏛️ Aetheria v1 — بوت التداول الكمي
+# 🏛️ Aetheria v1 — بوت التداول الكمي (Windows + MetaTrader5)
 
-بوت تداول **شبه أوتوماتيكي** (Semi-Automated) يعتمد على **التحليل الكمي البحت**
-(Pure Quantitative Analysis) كمرجع وحيد لاتخاذ القرارات — بدون عشوائية أو تقدير ذاتي.
-يعمل على بيئة **Termux (Android)** عبر واجهة **Telegram**، ويتصل بـ MetaTrader 5
-من خلال **MetaApi**.
+بوت تداول **شبه أوتوماتيكي / أوتوماتيكي** للذهب (XAUUSD) يعتمد على **التحليل
+الكمي البحت**. يعمل على **الحاسوب (Windows)** عبر مكتبة **MetaTrader5**
+الرسمية مباشرةً (بدون MetaApi)، وواجهة **Telegram** كاملة بالأزرار + **لوحة أدمن**.
 
 ---
 
-## 🧱 البنية الهندسية (Engine Pattern)
+## 🧱 البنية الهندسية
 
 ```
 aetheria/
 ├── config/
-│   └── settings.py          # مفاتيح API، إعدادات MetaApi، روابط CSV، ثوابت عامة
+│   └── settings.py          # توكن تلكرام، إعدادات MT5، الأدمن، المخاطر، روابط CSV
 ├── engines/
-│   ├── engine_base.py       # الكلاس المجرّد الأساس لكل المحركات (ABC)
-│   ├── mean_reversion.py    # محرك الارتداد للمتوسط (Bollinger Bands + RSI)
-│   └── trend_following.py   # محرك اتباع الاتجاه (EMA متعدد الفريمات) [قيد التطوير]
+│   ├── engine_base.py       # الكلاس المجرّد + Signal/SignalType + خطّافات الباكتيست
+│   ├── mean_reversion.py    # محرك الارتداد للمتوسط (Bollinger + RSI + ATR)
+│   ├── trend_following.py   # محرك اتباع الاتجاه (EMA + ADX)
+│   └── __init__.py          # ENGINE_REGISTRY + build_engine
 ├── data/
-│   ├── csv_fetcher.py       # جلب البيانات التاريخية من CSV (محلي/GitHub)
-│   └── live_fetcher.py      # جلب البيانات اللحظية من MT5 عبر MetaApi [قيد التطوير]
+│   ├── csv_fetcher.py       # بيانات تاريخية (CSV محلي/GitHub) للباكتيست
+│   └── live_fetcher.py      # بيانات لحظية من MetaTrader5
+├── core/
+│   ├── backtester.py        # محرك الباكتيست (Win Rate/PF/Drawdown/Sharpe)
+│   ├── trader.py            # تنفيذ الأوامر وإدارة المراكز عبر MT5
+│   └── state.py             # إدارة حالة البوت (محركات/مستخدمون/إحصاءات)
 ├── utils/
-│   └── telegram_utils.py    # تقطيع الرسائل الطويلة (≤4096) وتنسيق النصوص
-├── main.py                  # نقطة الدخول: ربط المحركات بالبوت [قيد التطوير]
+│   ├── telegram_utils.py    # تقطيع الرسائل ≤4096 + تنسيق التقارير/الإشارات
+│   ├── keyboards.py         # كل لوحات الأزرار التفاعلية
+│   └── auth.py              # التصريح (أدمن / مستخدمون مصرّح لهم)
+├── main.py                  # نقطة الدخول: ربط كل شيء + لوحة الأدمن
 ├── requirements.txt
 └── README.md
 ```
 
-> **فلسفة التصميم:** كل محرك مستقل تماماً وقابل للتشغيل بمفرده عبر
-> `if __name__ == "__main__"`، ويرث من `EngineBase`. هذا يسهّل الصيانة،
-> الاختبار، وإضافة استراتيجيات جديدة دون المساس بالباقي.
+---
+
+## ✅ المتطلبات
+
+- **Windows** (لأن مكتبة MetaTrader5 تعمل على Windows فقط).
+- **Python 3.10+** (64-bit، ليتوافق مع MT5).
+- **برنامج MetaTrader 5** مثبّتاً وفيه حساب (تجريبي يُفضّل) ومسجّل دخوله.
+- بوت تلكرام (توكن من [@BotFather](https://t.me/BotFather)).
 
 ---
 
-## ⚙️ التثبيت على Termux
+## ⚙️ التثبيت والتشغيل (خطوة بخطوة)
 
-```bash
-# 1) تحديث Termux وتثبيت Python
-pkg update && pkg upgrade -y
-pkg install python git -y
-
-# 2) استنساخ المستودع
-git clone https://github.com/kalidergham/aqc.git
-cd aqc/aetheria
-
-# 3) تثبيت المكتبات (كلها متوافقة مع Termux، بدون ta-lib)
+### 1) تثبيت بايثون والمكتبات
+```bat
+:: نزّل Python 3.10+ (64-bit) من python.org وفعّل "Add to PATH"
+git clone -b feat/aetheria-v1-bot https://github.com/kalidergham/aqc.git
+cd aqc\aetheria
 pip install -r requirements.txt
+```
 
-# 4) ضبط المتغيّرات السرّية (الأفضل من تعديل settings.py مباشرة)
-export AETHERIA_TG_TOKEN="ضع_توكن_بوت_تلكرام_هنا"
-export AETHERIA_METAAPI_TOKEN="ضع_توكن_MetaApi_هنا"
-export AETHERIA_METAAPI_ACCOUNT_ID="ضع_account_id_هنا"
+### 2) تجهيز MetaTrader 5
+- ثبّت MT5 وسجّل دخول حسابك (Demo موصى به للبداية).
+- فعّل: Tools → Options → Expert Advisors → *Allow Algo Trading*.
+- تأكّد أن رمز الذهب ظاهر في Market Watch (غالباً `XAUUSD`؛ بعض الوسطاء
+  يستخدمون `GOLD` أو `XAUUSDm` — عدّل `DEFAULT_SYMBOL` في الإعدادات لو لزم).
 
-# 5) التشغيل
+### 3) ضبط المتغيّرات (PowerShell)
+```powershell
+setx AETHERIA_TG_TOKEN     "123456:ABC..."          # توكن البوت
+setx AETHERIA_ADMIN_IDS    "123456789"              # معرّفك (أرسل /id للبوت لمعرفته)
+setx AETHERIA_MT5_LOGIN    "51234567"               # رقم حساب MT5
+setx AETHERIA_MT5_PASSWORD "كلمة_سر_التداول"
+setx AETHERIA_MT5_SERVER   "MetaQuotes-Demo"        # اسم خادم الوسيط
+setx AETHERIA_MT5_PATH     "C:\Program Files\MetaTrader 5\terminal64.exe"  # اختياري
+```
+> ⚠️ بعد `setx` **أعد فتح نافذة الأوامر** حتى تُحمّل المتغيّرات.
+
+### 4) التشغيل
+```bat
 python main.py
 ```
+ثم افتح بوتك في تلكرام وأرسل `/start`.
 
 ---
 
-## 🔗 ربط المشروع بمستودع GitHub وتحديثه (GitHub Sync)
+## 🎛️ التحكّم الكامل عبر الأزرار
 
-البيانات التاريخية (ملفات CSV) تُستضاف على GitHub، ويجلبها `csv_fetcher` تلقائياً
-عبر الروابط المعرّفة في `config/settings.py`.
+| القائمة | الوظيفة |
+|---|---|
+| 📊 **باكتيست** | اختر المحرك ← الفريم ← السنة، ويعطيك تقريراً كاملاً (Win Rate, Profit Factor, Max Drawdown, Sharpe, العائد). |
+| 📡 **تداول لحظي** | بدء/إيقاف المراقبة، تحليل فوري، عرض المراكز. عند ظهور إشارة: تنبيه مفصّل + زر تأكيد (أو تنفيذ آلي حسب الوضع). |
+| ⚙️ **الإعدادات** | تبديل الوضع (يدوي/أوتوماتيكي)، نسبة المخاطرة، حد الصفقات اليومي، الفريم، تفعيل/تعطيل المحركات. |
+| 📈 **الحالة** | مدة التشغيل، المحركات، حالة MT5، الرصيد، الإحصاءات. |
+| 🛡️ **لوحة الأدمن** | إدارة المستخدمين، الإحصاءات، حالة MT5، **إغلاق كل الصفقات (طوارئ)**، السجلّات، إعادة فحص الإعدادات. |
 
-### أول مرة (ربط مستودع جديد)
+**أوامر نصّية:** `/start` `/menu` `/help` `/id` `/adduser <id>` `/deluser <id>`
+
+---
+
+## 🔒 الأمان والصلاحيات
+- فقط **الأدمن** (في `AETHERIA_ADMIN_IDS`) والمستخدمون المُضافون يقدرون استخدام البوت.
+- لوحة الأدمن والإجراءات الحسّاسة (إغلاق الصفقات) محصورة بالأدمن.
+- الوضع الافتراضي **يدوي** (يطلب تأكيدك قبل أي صفقة) — للأمان.
+
+---
+
+## 🧪 اختبار المكوّنات بشكل مستقل
 ```bash
-git init
-git remote add origin https://github.com/<USERNAME>/<REPO>.git
-git add .
-git commit -m "Initial commit: Aetheria v1"
-git branch -M main
-git push -u origin main
+python -m config.settings          # فحص الإعدادات
+python -m engines.mean_reversion   # اختبار محرك الارتداد
+python -m engines.trend_following  # اختبار محرك الاتجاه
+python -m core.backtester          # اختبار الباكتيست على بيانات وهمية
+python -m core.state               # اختبار إدارة الحالة
+python -m utils.auth               # اختبار التصريح
+python -m utils.telegram_utils     # اختبار تقطيع الرسائل
 ```
 
-### تحديث المشروع لاحقاً
+---
+
+## 🔗 ربط المشروع بـ GitHub وتحديثه
 ```bash
 git add .
 git commit -m "وصف التعديل"
 git push
 ```
-
-### تحديث ملفات البيانات (CSV)
-1. ارفع ملفات `XAU_15m_data.csv` / `XAU_1h_data.csv` / `XAU_4h_data.csv` للمستودع.
-2. حدّث `GITHUB_RAW_BASE` و `CSV_URLS` في `config/settings.py` لتطابق
-   اسم المستخدم/المستودع/الفرع.
-3. الصيغة الرابطية للملف الخام:
-   `https://raw.githubusercontent.com/<user>/<repo>/<branch>/<file>.csv`
-
----
-
-## 📊 الأقسام الوظيفية
-
-| القسم | الوصف |
-|---|---|
-| **محرك الباكتيست** | يختار المستخدم السنة + التايم فريم عبر أزرار inline، يجلب CSV، ويحسب: Win Rate, Max Drawdown, Profit Factor, Sharpe Ratio. |
-| **محرك التداول اللحظي** | يتصل بـ MT5 (Demo) عبر MetaApi، يحلّل آخر كاندل، وعند الإشارة يرسل تنبيهاً مفصّلاً (الزوج/الاتجاه/الدخول/SL/TP) مع زر تأكيد يدوي. |
-
----
-
-## 🧪 اختبار محرك بشكل مستقل
-
-```bash
-python -m engines.mean_reversion     # يشغّل اختبار المحرك على بيانات وهمية
-python -m data.csv_fetcher           # يختبر جلب وتحليل CSV
-python -m utils.telegram_utils       # يختبر تقطيع الرسائل
-```
+البيانات التاريخية (CSV) تُجلب تلقائياً من الروابط في `settings.py`
+(`GITHUB_OWNER/REPO/BRANCH`). عدّلها إن غيّرت المستودع.
 
 ---
 
 ## ⚠️ إخلاء مسؤولية
-
-هذا المشروع لأغراض تعليمية وبحثية في التحليل الكمي. التداول في الأسواق المالية
-ينطوي على مخاطر عالية. **لا تشغّل البوت على حساب حقيقي قبل اختباره أشهراً على
-حساب تجريبي (Demo).** الأداء التاريخي لا يضمن النتائج المستقبلية.
+مشروع تعليمي/بحثي. التداول مخاطرة عالية. **لا تشغّله على حساب حقيقي قبل
+اختباره أشهراً على Demo.** الأداء التاريخي لا يضمن المستقبل.
