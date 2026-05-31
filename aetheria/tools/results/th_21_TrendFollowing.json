@@ -1,0 +1,579 @@
+{
+  "theory_id": 21,
+  "theory_name": "Tri-Consensus / Trend Following (التوافق الاتجاهي)",
+  "engine": "TrendFollowing",
+  "data": "XAUUSD 1h",
+  "train_years": "2014-2020",
+  "test_years": "2021-2025",
+  "method": "in-sample train selection, out-of-sample test reporting",
+  "best_params": {
+    "ema_fast": 20,
+    "ema_slow": 50,
+    "adx_period": 14,
+    "adx_threshold": 20,
+    "atr_period": 14,
+    "atr_mult": 2.0,
+    "rr": 1.5,
+    "max_trades_day": 10
+  },
+  "best_train": {
+    "trades": 357,
+    "win_rate": 40.62,
+    "profit_factor": 1.02,
+    "max_drawdown": 22.77,
+    "sharpe": 0.24,
+    "net_profit": 285.78,
+    "return_pct": 2.86
+  },
+  "best_test": {
+    "trades": 247,
+    "win_rate": 40.89,
+    "profit_factor": 1.02,
+    "max_drawdown": 24.47,
+    "sharpe": 0.28,
+    "net_profit": 370.71,
+    "return_pct": 3.71
+  },
+  "all_runs": [
+    {
+      "params": {
+        "ema_fast": 20,
+        "ema_slow": 50,
+        "adx_period": 14,
+        "adx_threshold": 15,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.5,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 529,
+        "win_rate": 37.24,
+        "profit_factor": 0.87,
+        "max_drawdown": 44.14,
+        "sharpe": -1.31,
+        "net_profit": -3321.25,
+        "return_pct": -33.21
+      },
+      "test": {
+        "trades": 358,
+        "win_rate": 39.39,
+        "profit_factor": 0.96,
+        "max_drawdown": 26.39,
+        "sharpe": -0.24,
+        "net_profit": -783.86,
+        "return_pct": -7.84
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 20,
+        "ema_slow": 50,
+        "adx_period": 14,
+        "adx_threshold": 15,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 501,
+        "win_rate": 30.14,
+        "profit_factor": 0.84,
+        "max_drawdown": 45.98,
+        "sharpe": -1.56,
+        "net_profit": -4098.75,
+        "return_pct": -40.99
+      },
+      "test": {
+        "trades": 332,
+        "win_rate": 34.04,
+        "profit_factor": 1.02,
+        "max_drawdown": 20.65,
+        "sharpe": 0.27,
+        "net_profit": 373.54,
+        "return_pct": 3.74
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 20,
+        "ema_slow": 50,
+        "adx_period": 14,
+        "adx_threshold": 20,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.5,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 357,
+        "win_rate": 40.62,
+        "profit_factor": 1.02,
+        "max_drawdown": 22.77,
+        "sharpe": 0.24,
+        "net_profit": 285.78,
+        "return_pct": 2.86
+      },
+      "test": {
+        "trades": 247,
+        "win_rate": 40.89,
+        "profit_factor": 1.02,
+        "max_drawdown": 24.47,
+        "sharpe": 0.28,
+        "net_profit": 370.71,
+        "return_pct": 3.71
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 20,
+        "ema_slow": 50,
+        "adx_period": 14,
+        "adx_threshold": 20,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 346,
+        "win_rate": 32.95,
+        "profit_factor": 0.96,
+        "max_drawdown": 30.65,
+        "sharpe": -0.15,
+        "net_profit": -714.94,
+        "return_pct": -7.15
+      },
+      "test": {
+        "trades": 232,
+        "win_rate": 35.34,
+        "profit_factor": 1.07,
+        "max_drawdown": 21.13,
+        "sharpe": 0.64,
+        "net_profit": 1232.94,
+        "return_pct": 12.33
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 20,
+        "ema_slow": 50,
+        "adx_period": 14,
+        "adx_threshold": 25,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.5,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 185,
+        "win_rate": 38.92,
+        "profit_factor": 0.94,
+        "max_drawdown": 18.7,
+        "sharpe": -0.3,
+        "net_profit": -617.21,
+        "return_pct": -6.17
+      },
+      "test": {
+        "trades": 142,
+        "win_rate": 38.73,
+        "profit_factor": 0.94,
+        "max_drawdown": 19.6,
+        "sharpe": -0.31,
+        "net_profit": -539.93,
+        "return_pct": -5.4
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 20,
+        "ema_slow": 50,
+        "adx_period": 14,
+        "adx_threshold": 25,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 182,
+        "win_rate": 32.42,
+        "profit_factor": 0.94,
+        "max_drawdown": 19.68,
+        "sharpe": -0.26,
+        "net_profit": -655.87,
+        "return_pct": -6.56
+      },
+      "test": {
+        "trades": 136,
+        "win_rate": 33.09,
+        "profit_factor": 0.98,
+        "max_drawdown": 18.45,
+        "sharpe": -0.06,
+        "net_profit": -231.89,
+        "return_pct": -2.32
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 50,
+        "ema_slow": 200,
+        "adx_period": 14,
+        "adx_threshold": 15,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.5,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 216,
+        "win_rate": 37.5,
+        "profit_factor": 0.89,
+        "max_drawdown": 22.6,
+        "sharpe": -0.76,
+        "net_profit": -1399.96,
+        "return_pct": -14.0
+      },
+      "test": {
+        "trades": 137,
+        "win_rate": 40.15,
+        "profit_factor": 0.99,
+        "max_drawdown": 12.38,
+        "sharpe": 0.03,
+        "net_profit": -52.4,
+        "return_pct": -0.52
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 50,
+        "ema_slow": 200,
+        "adx_period": 14,
+        "adx_threshold": 15,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 216,
+        "win_rate": 31.94,
+        "profit_factor": 0.93,
+        "max_drawdown": 21.16,
+        "sharpe": -0.44,
+        "net_profit": -1050.77,
+        "return_pct": -10.51
+      },
+      "test": {
+        "trades": 137,
+        "win_rate": 35.04,
+        "profit_factor": 1.06,
+        "max_drawdown": 11.36,
+        "sharpe": 0.42,
+        "net_profit": 576.47,
+        "return_pct": 5.76
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 50,
+        "ema_slow": 200,
+        "adx_period": 14,
+        "adx_threshold": 20,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.5,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 190,
+        "win_rate": 37.37,
+        "profit_factor": 0.89,
+        "max_drawdown": 24.78,
+        "sharpe": -0.75,
+        "net_profit": -1296.84,
+        "return_pct": -12.97
+      },
+      "test": {
+        "trades": 115,
+        "win_rate": 41.74,
+        "profit_factor": 1.06,
+        "max_drawdown": 10.63,
+        "sharpe": 0.38,
+        "net_profit": 421.45,
+        "return_pct": 4.21
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 50,
+        "ema_slow": 200,
+        "adx_period": 14,
+        "adx_threshold": 20,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 190,
+        "win_rate": 31.58,
+        "profit_factor": 0.92,
+        "max_drawdown": 26.1,
+        "sharpe": -0.52,
+        "net_profit": -1116.47,
+        "return_pct": -11.16
+      },
+      "test": {
+        "trades": 115,
+        "win_rate": 35.65,
+        "profit_factor": 1.09,
+        "max_drawdown": 11.36,
+        "sharpe": 0.52,
+        "net_profit": 705.61,
+        "return_pct": 7.06
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 50,
+        "ema_slow": 200,
+        "adx_period": 14,
+        "adx_threshold": 25,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.5,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 151,
+        "win_rate": 35.76,
+        "profit_factor": 0.83,
+        "max_drawdown": 23.11,
+        "sharpe": -1.08,
+        "net_profit": -1570.92,
+        "return_pct": -15.71
+      },
+      "test": {
+        "trades": 91,
+        "win_rate": 37.36,
+        "profit_factor": 0.89,
+        "max_drawdown": 11.3,
+        "sharpe": -0.52,
+        "net_profit": -644.83,
+        "return_pct": -6.45
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 50,
+        "ema_slow": 200,
+        "adx_period": 14,
+        "adx_threshold": 25,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 151,
+        "win_rate": 29.8,
+        "profit_factor": 0.85,
+        "max_drawdown": 25.9,
+        "sharpe": -0.95,
+        "net_profit": -1598.86,
+        "return_pct": -15.99
+      },
+      "test": {
+        "trades": 91,
+        "win_rate": 31.87,
+        "profit_factor": 0.92,
+        "max_drawdown": 10.47,
+        "sharpe": -0.3,
+        "net_profit": -476.71,
+        "return_pct": -4.77
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 20,
+        "ema_slow": 100,
+        "adx_period": 14,
+        "adx_threshold": 15,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.5,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 433,
+        "win_rate": 37.18,
+        "profit_factor": 0.87,
+        "max_drawdown": 33.31,
+        "sharpe": -1.21,
+        "net_profit": -2858.23,
+        "return_pct": -28.58
+      },
+      "test": {
+        "trades": 278,
+        "win_rate": 42.81,
+        "profit_factor": 1.1,
+        "max_drawdown": 14.25,
+        "sharpe": 0.94,
+        "net_profit": 1897.48,
+        "return_pct": 18.97
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 20,
+        "ema_slow": 100,
+        "adx_period": 14,
+        "adx_threshold": 15,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 427,
+        "win_rate": 29.74,
+        "profit_factor": 0.83,
+        "max_drawdown": 45.06,
+        "sharpe": -1.62,
+        "net_profit": -3935.71,
+        "return_pct": -39.36
+      },
+      "test": {
+        "trades": 274,
+        "win_rate": 37.23,
+        "profit_factor": 1.16,
+        "max_drawdown": 12.61,
+        "sharpe": 1.33,
+        "net_profit": 3380.46,
+        "return_pct": 33.8
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 20,
+        "ema_slow": 100,
+        "adx_period": 14,
+        "adx_threshold": 20,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.5,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 321,
+        "win_rate": 36.14,
+        "profit_factor": 0.83,
+        "max_drawdown": 36.03,
+        "sharpe": -1.44,
+        "net_profit": -2834.02,
+        "return_pct": -28.34
+      },
+      "test": {
+        "trades": 218,
+        "win_rate": 41.74,
+        "profit_factor": 1.06,
+        "max_drawdown": 14.19,
+        "sharpe": 0.52,
+        "net_profit": 816.32,
+        "return_pct": 8.16
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 20,
+        "ema_slow": 100,
+        "adx_period": 14,
+        "adx_threshold": 20,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 316,
+        "win_rate": 29.11,
+        "profit_factor": 0.8,
+        "max_drawdown": 41.55,
+        "sharpe": -1.65,
+        "net_profit": -3491.22,
+        "return_pct": -34.91
+      },
+      "test": {
+        "trades": 216,
+        "win_rate": 35.65,
+        "profit_factor": 1.08,
+        "max_drawdown": 14.56,
+        "sharpe": 0.71,
+        "net_profit": 1363.32,
+        "return_pct": 13.63
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 20,
+        "ema_slow": 100,
+        "adx_period": 14,
+        "adx_threshold": 25,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.5,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 220,
+        "win_rate": 39.55,
+        "profit_factor": 0.97,
+        "max_drawdown": 19.09,
+        "sharpe": -0.14,
+        "net_profit": -405.41,
+        "return_pct": -4.05
+      },
+      "test": {
+        "trades": 136,
+        "win_rate": 39.71,
+        "profit_factor": 0.98,
+        "max_drawdown": 11.89,
+        "sharpe": -0.07,
+        "net_profit": -199.41,
+        "return_pct": -1.99
+      }
+    },
+    {
+      "params": {
+        "ema_fast": 20,
+        "ema_slow": 100,
+        "adx_period": 14,
+        "adx_threshold": 25,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 215,
+        "win_rate": 31.16,
+        "profit_factor": 0.89,
+        "max_drawdown": 26.45,
+        "sharpe": -0.69,
+        "net_profit": -1484.3,
+        "return_pct": -14.84
+      },
+      "test": {
+        "trades": 136,
+        "win_rate": 33.09,
+        "profit_factor": 0.98,
+        "max_drawdown": 14.1,
+        "sharpe": -0.06,
+        "net_profit": -231.89,
+        "return_pct": -2.32
+      }
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+# متطلبات بوت أثيريا (Aetheria v1) — نسخة سطح المكتب (Windows)
+# تُثبَّت عبر: pip install -r requirements.txt
+
+# --- واجهة Telegram ---
+pyTelegramBotAPI>=4.14.0      # telebot: الأزرار التفاعلية InlineKeyboardMarkup
+
+# --- التحليل الكمي ---
+pandas>=2.0.0                 # معالجة البيانات السعرية (DataFrame)
+numpy>=1.24.0                 # العمليات الرياضية المتجهة (vectorized)
+
+# --- الشبكة والبيانات ---
+requests>=2.31.0              # جلب ملفات CSV من GitHub للباكتيست
+
+# --- منصة التداول (Windows فقط) ---
+# المكتبة الرسمية للتداول المباشر مع منصة MetaTrader 5 على Windows.
+# (لا حاجة لـ MetaApi إطلاقاً).
+MetaTrader5>=5.0.45 ; platform_system == "Windows"

@@ -1,0 +1,784 @@
+{
+  "theory_id": 18,
+  "theory_name": "Mean Reversion (تذبذب الجاذبية الإحصائية)",
+  "engine": "MeanReversion",
+  "data": "XAUUSD 1h",
+  "train_years": "2014-2020",
+  "test_years": "2021-2025",
+  "method": "in-sample train selection, out-of-sample test reporting",
+  "best_params": {
+    "bb_period": 20,
+    "bb_std": 2.5,
+    "rsi_period": 14,
+    "oversold": 30,
+    "overbought": 70,
+    "atr_period": 14,
+    "atr_mult": 2.0,
+    "rr": 2.0,
+    "max_trades_day": 10
+  },
+  "best_train": {
+    "trades": 667,
+    "win_rate": 30.28,
+    "profit_factor": 0.86,
+    "max_drawdown": 51.41,
+    "sharpe": -1.49,
+    "net_profit": -4524.93,
+    "return_pct": -45.25
+  },
+  "best_test": {
+    "trades": 434,
+    "win_rate": 32.95,
+    "profit_factor": 0.99,
+    "max_drawdown": 33.29,
+    "sharpe": 0.08,
+    "net_profit": -200.47,
+    "return_pct": -2.0
+  },
+  "all_runs": [
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "rsi_period": 14,
+        "oversold": 30,
+        "overbought": 70,
+        "atr_period": 14,
+        "atr_mult": 1.5,
+        "rr": 1.3,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 1218,
+        "win_rate": 28.74,
+        "profit_factor": 0.78,
+        "max_drawdown": 86.1,
+        "sharpe": -3.7,
+        "net_profit": -8488.27,
+        "return_pct": -84.88
+      },
+      "test": {
+        "trades": 786,
+        "win_rate": 32.19,
+        "profit_factor": 0.94,
+        "max_drawdown": 38.34,
+        "sharpe": -0.6,
+        "net_profit": -2772.65,
+        "return_pct": -27.73
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "rsi_period": 14,
+        "oversold": 30,
+        "overbought": 70,
+        "atr_period": 14,
+        "atr_mult": 1.5,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 1202,
+        "win_rate": 27.04,
+        "profit_factor": 0.81,
+        "max_drawdown": 83.54,
+        "sharpe": -3.17,
+        "net_profit": -8180.16,
+        "return_pct": -81.8
+      },
+      "test": {
+        "trades": 778,
+        "win_rate": 29.95,
+        "profit_factor": 0.94,
+        "max_drawdown": 32.56,
+        "sharpe": -0.54,
+        "net_profit": -2676.23,
+        "return_pct": -26.76
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "rsi_period": 14,
+        "oversold": 30,
+        "overbought": 70,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.3,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 989,
+        "win_rate": 34.98,
+        "profit_factor": 0.83,
+        "max_drawdown": 70.1,
+        "sharpe": -2.56,
+        "net_profit": -6584.81,
+        "return_pct": -65.85
+      },
+      "test": {
+        "trades": 660,
+        "win_rate": 38.18,
+        "profit_factor": 0.96,
+        "max_drawdown": 30.06,
+        "sharpe": -0.31,
+        "net_profit": -1422.99,
+        "return_pct": -14.23
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "rsi_period": 14,
+        "oversold": 30,
+        "overbought": 70,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 942,
+        "win_rate": 29.72,
+        "profit_factor": 0.84,
+        "max_drawdown": 67.94,
+        "sharpe": -2.15,
+        "net_profit": -6353.91,
+        "return_pct": -63.54
+      },
+      "test": {
+        "trades": 608,
+        "win_rate": 31.91,
+        "profit_factor": 0.95,
+        "max_drawdown": 38.31,
+        "sharpe": -0.46,
+        "net_profit": -2002.61,
+        "return_pct": -20.03
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "rsi_period": 14,
+        "oversold": 25,
+        "overbought": 75,
+        "atr_period": 14,
+        "atr_mult": 1.5,
+        "rr": 1.3,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 664,
+        "win_rate": 24.55,
+        "profit_factor": 0.73,
+        "max_drawdown": 77.13,
+        "sharpe": -3.61,
+        "net_profit": -7529.01,
+        "return_pct": -75.29
+      },
+      "test": {
+        "trades": 390,
+        "win_rate": 28.72,
+        "profit_factor": 0.9,
+        "max_drawdown": 30.16,
+        "sharpe": -0.82,
+        "net_profit": -2518.22,
+        "return_pct": -25.18
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "rsi_period": 14,
+        "oversold": 25,
+        "overbought": 75,
+        "atr_period": 14,
+        "atr_mult": 1.5,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 658,
+        "win_rate": 22.95,
+        "profit_factor": 0.71,
+        "max_drawdown": 79.15,
+        "sharpe": -3.9,
+        "net_profit": -7802.2,
+        "return_pct": -78.02
+      },
+      "test": {
+        "trades": 390,
+        "win_rate": 28.21,
+        "profit_factor": 0.93,
+        "max_drawdown": 27.36,
+        "sharpe": -0.52,
+        "net_profit": -1848.56,
+        "return_pct": -18.49
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "rsi_period": 14,
+        "oversold": 25,
+        "overbought": 75,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.3,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 558,
+        "win_rate": 30.82,
+        "profit_factor": 0.77,
+        "max_drawdown": 60.56,
+        "sharpe": -2.78,
+        "net_profit": -5900.63,
+        "return_pct": -59.01
+      },
+      "test": {
+        "trades": 347,
+        "win_rate": 36.02,
+        "profit_factor": 0.98,
+        "max_drawdown": 24.15,
+        "sharpe": -0.08,
+        "net_profit": -496.84,
+        "return_pct": -4.97
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "rsi_period": 14,
+        "oversold": 25,
+        "overbought": 75,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 544,
+        "win_rate": 26.65,
+        "profit_factor": 0.74,
+        "max_drawdown": 65.05,
+        "sharpe": -3.08,
+        "net_profit": -6434.61,
+        "return_pct": -64.35
+      },
+      "test": {
+        "trades": 333,
+        "win_rate": 33.33,
+        "profit_factor": 1.03,
+        "max_drawdown": 19.23,
+        "sharpe": 0.37,
+        "net_profit": 664.55,
+        "return_pct": 6.65
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "rsi_period": 14,
+        "oversold": 20,
+        "overbought": 80,
+        "atr_period": 14,
+        "atr_mult": 1.5,
+        "rr": 1.3,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 284,
+        "win_rate": 21.83,
+        "profit_factor": 0.69,
+        "max_drawdown": 51.4,
+        "sharpe": -2.7,
+        "net_profit": -5051.42,
+        "return_pct": -50.51
+      },
+      "test": {
+        "trades": 156,
+        "win_rate": 25.64,
+        "profit_factor": 0.86,
+        "max_drawdown": 21.83,
+        "sharpe": -0.74,
+        "net_profit": -1535.1,
+        "return_pct": -15.35
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "rsi_period": 14,
+        "oversold": 20,
+        "overbought": 80,
+        "atr_period": 14,
+        "atr_mult": 1.5,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 283,
+        "win_rate": 20.85,
+        "profit_factor": 0.67,
+        "max_drawdown": 52.96,
+        "sharpe": -2.82,
+        "net_profit": -5210.19,
+        "return_pct": -52.1
+      },
+      "test": {
+        "trades": 156,
+        "win_rate": 25.64,
+        "profit_factor": 0.88,
+        "max_drawdown": 20.55,
+        "sharpe": -0.57,
+        "net_profit": -1269.0,
+        "return_pct": -12.69
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "rsi_period": 14,
+        "oversold": 20,
+        "overbought": 80,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.3,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 241,
+        "win_rate": 26.56,
+        "profit_factor": 0.68,
+        "max_drawdown": 43.85,
+        "sharpe": -2.68,
+        "net_profit": -4322.36,
+        "return_pct": -43.22
+      },
+      "test": {
+        "trades": 147,
+        "win_rate": 36.05,
+        "profit_factor": 1.09,
+        "max_drawdown": 13.79,
+        "sharpe": 0.57,
+        "net_profit": 890.41,
+        "return_pct": 8.9
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.0,
+        "rsi_period": 14,
+        "oversold": 20,
+        "overbought": 80,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 239,
+        "win_rate": 24.27,
+        "profit_factor": 0.67,
+        "max_drawdown": 44.77,
+        "sharpe": -2.66,
+        "net_profit": -4414.95,
+        "return_pct": -44.15
+      },
+      "test": {
+        "trades": 144,
+        "win_rate": 31.94,
+        "profit_factor": 1.03,
+        "max_drawdown": 17.7,
+        "sharpe": 0.25,
+        "net_profit": 287.57,
+        "return_pct": 2.88
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.5,
+        "rsi_period": 14,
+        "oversold": 30,
+        "overbought": 70,
+        "atr_period": 14,
+        "atr_mult": 1.5,
+        "rr": 1.3,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 824,
+        "win_rate": 27.79,
+        "profit_factor": 0.74,
+        "max_drawdown": 78.89,
+        "sharpe": -3.43,
+        "net_profit": -7623.25,
+        "return_pct": -76.23
+      },
+      "test": {
+        "trades": 511,
+        "win_rate": 32.49,
+        "profit_factor": 0.95,
+        "max_drawdown": 28.56,
+        "sharpe": -0.35,
+        "net_profit": -1538.57,
+        "return_pct": -15.39
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.5,
+        "rsi_period": 14,
+        "oversold": 30,
+        "overbought": 70,
+        "atr_period": 14,
+        "atr_mult": 1.5,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 816,
+        "win_rate": 26.59,
+        "profit_factor": 0.78,
+        "max_drawdown": 73.37,
+        "sharpe": -2.78,
+        "net_profit": -7080.13,
+        "return_pct": -70.8
+      },
+      "test": {
+        "trades": 505,
+        "win_rate": 30.1,
+        "profit_factor": 0.95,
+        "max_drawdown": 26.78,
+        "sharpe": -0.34,
+        "net_profit": -1589.05,
+        "return_pct": -15.89
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.5,
+        "rsi_period": 14,
+        "oversold": 30,
+        "overbought": 70,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.3,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 692,
+        "win_rate": 34.54,
+        "profit_factor": 0.82,
+        "max_drawdown": 60.94,
+        "sharpe": -2.33,
+        "net_profit": -5570.53,
+        "return_pct": -55.71
+      },
+      "test": {
+        "trades": 455,
+        "win_rate": 38.46,
+        "profit_factor": 0.98,
+        "max_drawdown": 27.42,
+        "sharpe": -0.05,
+        "net_profit": -494.51,
+        "return_pct": -4.95
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.5,
+        "rsi_period": 14,
+        "oversold": 30,
+        "overbought": 70,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 667,
+        "win_rate": 30.28,
+        "profit_factor": 0.86,
+        "max_drawdown": 51.41,
+        "sharpe": -1.49,
+        "net_profit": -4524.93,
+        "return_pct": -45.25
+      },
+      "test": {
+        "trades": 434,
+        "win_rate": 32.95,
+        "profit_factor": 0.99,
+        "max_drawdown": 33.29,
+        "sharpe": 0.08,
+        "net_profit": -200.47,
+        "return_pct": -2.0
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.5,
+        "rsi_period": 14,
+        "oversold": 25,
+        "overbought": 75,
+        "atr_period": 14,
+        "atr_mult": 1.5,
+        "rr": 1.3,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 435,
+        "win_rate": 25.29,
+        "profit_factor": 0.76,
+        "max_drawdown": 56.92,
+        "sharpe": -2.29,
+        "net_profit": -5280.05,
+        "return_pct": -52.8
+      },
+      "test": {
+        "trades": 241,
+        "win_rate": 28.63,
+        "profit_factor": 0.91,
+        "max_drawdown": 25.52,
+        "sharpe": -0.54,
+        "net_profit": -1446.15,
+        "return_pct": -14.46
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.5,
+        "rsi_period": 14,
+        "oversold": 25,
+        "overbought": 75,
+        "atr_period": 14,
+        "atr_mult": 1.5,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 433,
+        "win_rate": 24.48,
+        "profit_factor": 0.77,
+        "max_drawdown": 56.46,
+        "sharpe": -2.23,
+        "net_profit": -5233.86,
+        "return_pct": -52.34
+      },
+      "test": {
+        "trades": 241,
+        "win_rate": 28.22,
+        "profit_factor": 0.94,
+        "max_drawdown": 22.07,
+        "sharpe": -0.31,
+        "net_profit": -988.84,
+        "return_pct": -9.89
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.5,
+        "rsi_period": 14,
+        "oversold": 25,
+        "overbought": 75,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.3,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 376,
+        "win_rate": 31.91,
+        "profit_factor": 0.81,
+        "max_drawdown": 40.96,
+        "sharpe": -1.72,
+        "net_profit": -3745.64,
+        "return_pct": -37.46
+      },
+      "test": {
+        "trades": 220,
+        "win_rate": 36.82,
+        "profit_factor": 1.03,
+        "max_drawdown": 17.9,
+        "sharpe": 0.33,
+        "net_profit": 469.73,
+        "return_pct": 4.7
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.5,
+        "rsi_period": 14,
+        "oversold": 25,
+        "overbought": 75,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 363,
+        "win_rate": 28.37,
+        "profit_factor": 0.8,
+        "max_drawdown": 40.87,
+        "sharpe": -1.74,
+        "net_profit": -3910.76,
+        "return_pct": -39.11
+      },
+      "test": {
+        "trades": 215,
+        "win_rate": 33.95,
+        "profit_factor": 1.07,
+        "max_drawdown": 20.7,
+        "sharpe": 0.54,
+        "net_profit": 977.9,
+        "return_pct": 9.78
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.5,
+        "rsi_period": 14,
+        "oversold": 20,
+        "overbought": 80,
+        "atr_period": 14,
+        "atr_mult": 1.5,
+        "rr": 1.3,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 181,
+        "win_rate": 18.78,
+        "profit_factor": 0.62,
+        "max_drawdown": 45.06,
+        "sharpe": -2.93,
+        "net_profit": -4472.19,
+        "return_pct": -44.72
+      },
+      "test": {
+        "trades": 95,
+        "win_rate": 27.37,
+        "profit_factor": 0.98,
+        "max_drawdown": 15.26,
+        "sharpe": -0.02,
+        "net_profit": -160.91,
+        "return_pct": -1.61
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.5,
+        "rsi_period": 14,
+        "oversold": 20,
+        "overbought": 80,
+        "atr_period": 14,
+        "atr_mult": 1.5,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 181,
+        "win_rate": 18.78,
+        "profit_factor": 0.63,
+        "max_drawdown": 44.12,
+        "sharpe": -2.82,
+        "net_profit": -4376.8,
+        "return_pct": -43.77
+      },
+      "test": {
+        "trades": 95,
+        "win_rate": 27.37,
+        "profit_factor": 1.0,
+        "max_drawdown": 14.91,
+        "sharpe": 0.08,
+        "net_profit": 1.85,
+        "return_pct": 0.02
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.5,
+        "rsi_period": 14,
+        "oversold": 20,
+        "overbought": 80,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 1.3,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 159,
+        "win_rate": 24.53,
+        "profit_factor": 0.63,
+        "max_drawdown": 36.64,
+        "sharpe": -2.73,
+        "net_profit": -3663.75,
+        "return_pct": -36.64
+      },
+      "test": {
+        "trades": 90,
+        "win_rate": 34.44,
+        "profit_factor": 1.08,
+        "max_drawdown": 11.22,
+        "sharpe": 0.4,
+        "net_profit": 479.96,
+        "return_pct": 4.8
+      }
+    },
+    {
+      "params": {
+        "bb_period": 20,
+        "bb_std": 2.5,
+        "rsi_period": 14,
+        "oversold": 20,
+        "overbought": 80,
+        "atr_period": 14,
+        "atr_mult": 2.0,
+        "rr": 2.0,
+        "max_trades_day": 10
+      },
+      "train": {
+        "trades": 159,
+        "win_rate": 23.9,
+        "profit_factor": 0.67,
+        "max_drawdown": 33.38,
+        "sharpe": -2.29,
+        "net_profit": -3337.92,
+        "return_pct": -33.38
+      },
+      "test": {
+        "trades": 90,
+        "win_rate": 33.33,
+        "profit_factor": 1.13,
+        "max_drawdown": 10.97,
+        "sharpe": 0.58,
+        "net_profit": 785.91,
+        "return_pct": 7.86
+      }
+    }
+  ]
+}
