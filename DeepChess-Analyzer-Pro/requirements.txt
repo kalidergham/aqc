@@ -1,0 +1,14 @@
+# DeepChess Analyzer Pro - Python dependencies
+#
+# Core (required):
+chess>=1.11.0          # python-chess: move generation & legality ONLY
+kivy>=2.3.0            # GUI framework (touch / desktop / mobile)
+
+# Recommended (correct Arabic text shaping in the UI). The app still runs
+# without these, but Arabic strings will look disconnected / reversed.
+arabic-reshaper>=3.0.0
+python-bidi>=0.4.2
+
+# Pillow is used by Kivy as a fallback image / text provider on some
+# platforms and is required by the "screenshot board" feature.
+pillow>=9.0.0

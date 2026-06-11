@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Buildozer / Android artefacts
+.buildozer/
+bin/
+
+# App-generated files
+deepchess_game.pgn
+deepchess_position.png
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
