@@ -1194,9 +1194,10 @@ class Engine{
     if(this.mode==='sf') return this._enqueue(()=>this._sfAnalyze(fen,{depth:10+level*2, multipv:2, onProgress}));
     return this._enqueue(()=>this._jsAnalyze(fen,{depth:Math.min(4,level), onProgress}));
   }
-  analyzeFind(fen, level, legalCount, onProgress){
-    if(this.mode==='sf') return this._enqueue(()=>this._sfAnalyze(fen,{movetime:Math.min(4500,level*900), multipv:Math.min(legalCount||1,64), onProgress}));
-    return this._enqueue(()=>this._jsAnalyze(fen,{depth:Math.min(5,level), onProgress}));
+  analyzeFind(fen, level, multipv, onProgress){
+    const L=Math.max(1, level||1);
+    if(this.mode==='sf') return this._enqueue(()=>this._sfAnalyze(fen,{movetime:Math.min(4500,L*900), multipv:Math.min(multipv||1,128), onProgress}));
+    return this._enqueue(()=>this._jsAnalyze(fen,{depth:Math.min(5,L), onProgress}));
   }
 }
 const engine = new Engine();
@@ -1540,7 +1541,7 @@ function clearFinderResults(){ $('#brilliantResults').innerHTML=''; $('#findStat
 
 $('#findBtn').addEventListener('click', findBrilliantMoves);
 async function findBrilliantMoves(){
-  // التحقق من صحة الوضعية: ملك أبيض واحد وملك أسود واحد
+  // ===== التحقق من صحة الوضعية (ملك واحد لكل لون + FEN صالح) =====
   let wk=0,bk=0; for(const sq in board2.position){ const p=board2.position[sq]; if(p.type==='k'){ p.color==='w'?wk++:bk++; } }
   if(wk!==1||bk!==1){ toast('يجب وجود ملك أبيض واحد وملك أسود واحد'); $('#findStatus').textContent='⚠️ الوضعية تحتاج ملكاً واحداً لكل لون.'; return; }
   const fen=board2.toFEN(selectedSide);
@@ -1550,53 +1551,98 @@ async function findBrilliantMoves(){
   const legal=ch.moves({verbose:true});
   if(!legal.length){ toast('لا توجد نقلات قانونية (كش مات/تعادل)'); $('#findStatus').textContent='لا توجد نقلات.'; return; }
 
-  const st=$('#findStatus'); const level=+$('#depthRange2').value;
-  $('#findBtn').disabled=true; $('#findProgWrap').style.display=''; $('#findProg').style.width='0%';
-  $('#findPct').style.display=''; $('#findPct').textContent='0%';
+  const st=$('#findStatus'); const out=$('#brilliantResults'); const level=+$('#depthRange2').value;
+  $('#findBtn').disabled=true; $('#findProgWrap').style.display=''; $('#findPct').style.display='';
   clearFinderResults();
+  const uciOf=m=>m.from+m.to+(m.promotion||'');
+  const setPct=(f)=>{ const p=Math.max(0,Math.min(100,Math.round(f*100))); $('#findProg').style.width=p+'%'; $('#findPct').textContent=p+'%'; };
+
+  // ===== الخطوة 0: تهيئة المحرك (0%) =====
+  setPct(0); st.innerHTML='<div class="spinner"></div> تهيئة المحرك…';
   try{ await engine.init(); }
   catch(err){ st.textContent='⚠️ '+err.message; $('#findBtn').disabled=false; $('#findProgWrap').style.display='none'; $('#findPct').style.display='none'; return; }
 
-  st.innerHTML='<div class="spinner"></div> ['+engine.modeName+'] يفحص المحرك جميع النقلات…';
-  const setPct=(f)=>{ const p=Math.round(f*100); $('#findProg').style.width=p+'%'; $('#findPct').textContent=p+'%'; };
-  const res=await engine.analyzeFind(fen, level, legal.length, setPct);
-  setPct(1);
-  const lines=res.lines; if(!lines.length){ st.textContent='تعذّر الحصول على نتائج.'; $('#findBtn').disabled=false; $('#findProgWrap').style.display='none'; $('#findPct').style.display='none'; return; }
-  const cpBest=scoreToCp(lines[0]); const second=lines[1]?scoreToCp(lines[1]):null;
+  // ===== الخطوة 1: تحليل الموقف كاملاً عبر MultiPV (5% → 55%) =====
+  setPct(0.05); st.innerHTML='<div class="spinner"></div> ['+engine.modeName+'] تحليل كل النقلات…';
+  const res=await engine.analyzeFind(fen, level, Math.min(legal.length,128), (f)=>setPct(0.05 + f*0.50));
+  const lines=(res&&res.lines)||[];
+  if(!lines.length){ st.textContent='تعذّر الحصول على نتائج من المحرك.'; $('#findBtn').disabled=false; $('#findProgWrap').style.display='none'; $('#findPct').style.display='none'; return; }
+  // خريطة: uci → تقييم النقلة (من منظور صاحب الدور)
+  const evalMap={}; lines.forEach(ln=>{ if(ln&&ln.move) evalMap[ln.move]=scoreToCp(ln); });
+  setPct(0.55);
 
-  const found=[]; // {san,from,to,key,cp}
-  lines.forEach((ln,i)=>{
-    const uci=ln.move; const from=uci.slice(0,2), to=uci.slice(2,4), promo=uci.slice(4,5)||undefined;
-    const mvObj=legal.find(m=>m.from===from&&m.to===to&&(m.promotion||'')===(promo||''));
-    if(!mvObj) return;
-    const sac=sacrificeInfo(fen, mvObj);
-    const key=classifyMove({cpBest, cpPlayed:scoreToCp(ln), isBest:i===0, secondBest:second, sac});
-    found.push({san:mvObj.san, from, to, key, cp:scoreToCp(ln), sac});
-  });
-
-  // أظهر فقط Brilliant، وإلا Great
-  let show=found.filter(f=>f.key==='Brilliant');
-  let label='Brilliant';
-  if(!show.length){ show=found.filter(f=>f.key==='Great'); label='Great'; }
-
-  $('#findProg').style.width='100%'; setTimeout(()=>{$('#findProgWrap').style.display='none'; $('#findPct').style.display='none';},500);
-  $('#findBtn').disabled=false;
-  const out=$('#brilliantResults');
-  if(!show.length){
-    st.textContent='لم يُعثر على نقلة Brilliant أو Great في هذا الوضع.';
-    out.innerHTML='<div class="empty">لا توجد نقلة عبقرية أو رائعة هنا — أفضل نقلة للمحرك: <b dir="ltr">'+(lines[0].move)+'</b></div>';
-    board2.clearHighlights();
-    return;
+  // ===== الخطوة 2: فحص النقلات الغائبة عن MultiPV وتقييمها منفردة (55% → 85%) =====
+  const missing=legal.filter(m=> evalMap[uciOf(m)]===undefined );
+  for(let i=0;i<missing.length;i++){
+    const m=missing[i];
+    st.innerHTML=`<div class="spinner"></div> فحص نقلة غائبة: <b dir="ltr">${m.san}</b> (${i+1}/${missing.length})`;
+    const c=new Chess(fen); c.move({from:m.from,to:m.to,promotion:(m.promotion||'q')});
+    let cp;
+    if(c.in_checkmate()) cp=1000000;            // نقلتنا كش مات
+    else if(c.game_over()) cp=0;                 // تعادل
+    else { const ar=await engine.analyzeFind(c.fen(), Math.max(1,level-2), 1, ()=>{}); cp = (ar.lines&&ar.lines.length)? -scoreToCp(ar.lines[0]) : 0; }
+    evalMap[uciOf(m)]=cp;
+    setPct(0.55 + ((i+1)/missing.length)*0.30);
   }
-  st.textContent=`تم العثور على ${show.length} نقلة ${label==='Brilliant'?'عبقرية ‼':'رائعة !'}`;
-  out.innerHTML=show.map(f=>{
-    const ci=CLASS_INFO[f.key]; const evalTxt=(f.cp/100).toFixed(2);
-    const sacTxt=f.sac&&f.sac.isSac?` · تضحية بـ ${(f.sac.amount/100).toFixed(1)} وحدة مادية`:'';
-    return `<div class="brilliant-card"><span class="mvbig">${f.san}</span><div style="font-size:11px;color:var(--text-dim)">تقييم بعد النقلة: <b dir="ltr">${evalTxt}</b>${sacTxt}</div><span class="tag">${classChip(f.key)}</span></div>`;
-  }).join('');
-  // إبراز أول نقلة على الرقعة
-  const top=show[0]; const ci=CLASS_INFO[top.key];
-  board2.highlight(top.from,top.to,{sym:ci.sym,color:ci.css});
+  if(!missing.length) setPct(0.85);
+
+  // ===== الخطوة 3: تصنيف كل نقلة بعتبات محسّنة (85% → 95%) =====
+  setPct(0.86); st.innerHTML='<div class="spinner"></div> تصنيف النقلات…';
+  // ترتيب جميع النقلات حسب التقييم لاستخراج الأفضل والثاني
+  const evals=legal.map(m=>({m, uci:uciOf(m), cp: evalMap[uciOf(m)]})).filter(e=>e.cp!=null).sort((a,b)=>b.cp-a.cp);
+  const cpBest=evals[0].cp;
+  const second=evals.length>1?evals[1].cp:(cpBest-1000); // إن لم يوجد بديل نفترض فارقاً كبيراً
+  const bestUci=evals[0].uci;
+  const gap=cpBest-second;
+
+  const brilliant=[], great=[];
+  for(const e of evals){
+    const cpPlayed=e.cp; const cpl=Math.max(0,cpBest-cpPlayed); const isBest=(e.uci===bestUci);
+    const sac=sacrificeInfo(fen, e.m); // {isSac, amount, net}
+    // --- Brilliant: تضحية مادية تبقى ضمن الأفضل ولا تخسر الأفضلية ---
+    if(sac.isSac && sac.amount>=100 && cpl<=80 && cpPlayed>=-100){
+      brilliant.push({...e, key:'Brilliant', sac, why:`تضحية بـ ${(sac.amount/100).toFixed(1)} وحدة مادية مع بقائها ضمن الأفضل (فقد ${cpl} سنتيبون فقط، التقييم ${(cpPlayed/100).toFixed(2)})`});
+      continue;
+    }
+    // --- Great شرط 1: أفضل نقلة وتتفوق بوضوح على البديل ---
+    if(isBest && gap>=100 && cpl<=50){
+      great.push({...e, key:'Great', sac, why:`أفضل نقلة وتتفوّق على البديل بـ ${Math.min(gap,99999)} سنتيبون`});
+      continue;
+    }
+    // --- Great شرط 2: أكلة استراتيجية قوية (ليست تضحية كلاسيكية) ---
+    if(e.m.captured && !sac.isSac && cpl<=30 && gap>=80 && isBest){
+      great.push({...e, key:'Great', sac, why:`أكلة استراتيجية قوية: أفضل نقلة بفارق ${Math.min(gap,99999)} سنتيبون عن البديل`});
+      continue;
+    }
+  }
+
+  // ===== الخطوة 4: عرض القسمين معاً (95% → 100%) =====
+  setPct(0.95);
+  const fmtEval=cp=> Math.abs(cp)>=100000 ? (cp>0?'#':'-#') : ((cp>=0?'+':'')+(cp/100).toFixed(2));
+  const card=(f)=>{ const ci=CLASS_INFO[f.key];
+    return `<div class="brilliant-card"><span class="mvbig">${f.m.san}</span>`
+      +`<div style="font-size:11px;color:var(--text-dim)">تقييم بعد النقلة: <b dir="ltr">${fmtEval(f.cp)}</b> · ${f.why}</div>`
+      +`<span class="tag">${classChip(f.key)}</span></div>`; };
+
+  let html='';
+  if(brilliant.length){ html+=`<h2 style="margin:8px 0 2px">${CLASS_INFO.Brilliant.sym} <span style="color:${CLASS_INFO.Brilliant.css}">${T('Brilliant')}</span> (${brilliant.length})</h2>`+brilliant.map(card).join(''); }
+  if(great.length){ html+=`<h2 style="margin:12px 0 2px">${CLASS_INFO.Great.sym} <span style="color:${CLASS_INFO.Great.css}">${T('Great')}</span> (${great.length})</h2>`+great.map(card).join(''); }
+  if(!brilliant.length && !great.length){ html=`<div class="empty">لا توجد نقلة عبقرية أو رائعة في هذا الوضع — أفضل نقلة للمحرك: <b dir="ltr">${bestUci}</b> (${fmtEval(cpBest)})</div>`; }
+  out.innerHTML=html;
+
+  // إبراز أول نقلة (Brilliant أولاً ثم Great)
+  const top=brilliant[0]||great[0];
+  if(top){ const ci=CLASS_INFO[top.key]; board2.highlight(top.m.from, top.m.to, {sym:ci.sym,color:ci.css}); }
+  else board2.clearHighlights();
+
+  st.textContent = (brilliant.length||great.length)
+    ? `عُثر على ${brilliant.length} نقلة عبقرية ‼ و ${great.length} نقلة رائعة !`
+    : 'لم يُعثر على نقلة عبقرية أو رائعة.';
+
+  // ===== الخطوة 5: إنهاء العداد =====
+  setPct(1);
+  $('#findBtn').disabled=false;
+  setTimeout(()=>{ $('#findProgWrap').style.display='none'; $('#findPct').style.display='none'; },600);
 }
 
 /* =====================================================================
