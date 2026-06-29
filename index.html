@@ -159,7 +159,10 @@ textarea{resize:vertical;min-height:80px;direction:ltr;text-align:left;}
 .board .sq{position:absolute;width:12.5%;height:12.5%;}
 .board .sq.light{background:var(--board-light);}
 .board .sq.dark{background:var(--board-dark);}
-.board .sq .coord{position:absolute;font-size:9px;font-weight:700;opacity:.55;padding:1px 3px;}
+.board .sq .coord{position:absolute;font-size:9px;font-weight:800;padding:1px 3px;pointer-events:none;}
+/* لون الإحداثيات يكون عكس لون المربع لضمان التباين مع كل الثيمات */
+.board .sq.light .coord{color:var(--board-dark);}
+.board .sq.dark .coord{color:var(--board-light);}
 .board .sq .coord.file{bottom:0;right:2px;}
 .board .sq .coord.rank{top:0;left:2px;}
 .board .piece{
@@ -1242,6 +1245,27 @@ function sacrificeInfo(fenBefore, move){
   const net = capturedValue - opponentGain;          // صافي المادة للّاعب على ذلك المربع
   return {isSac: net <= -100, amount: Math.max(0,-net), net};
 }
+/* أداة: تعديل مربع في FEN وتغيير الدور (تُستخدم لحساب المدافعين) */
+function setSquareInFen(fen, square, pieceChar, turnColor){
+  const parts=fen.split(' '); const rows=parts[0].split('/');
+  const file='abcdefgh'.indexOf(square[0]); const rank=parseInt(square[1]); const rowIdx=8-rank;
+  const exp=[]; for(const ch of rows[rowIdx]){ if(/\d/.test(ch)){ for(let i=0;i<+ch;i++)exp.push(''); } else exp.push(ch); }
+  exp[file]=pieceChar;
+  let comp='',empty=0; for(let i=0;i<8;i++){ if(exp[i]===''){empty++;} else { if(empty){comp+=empty;empty=0;} comp+=exp[i]; } } if(empty)comp+=empty;
+  rows[rowIdx]=comp; parts[0]=rows.join('/'); parts[1]=turnColor; parts[3]='-';
+  return parts.join(' ');
+}
+/* عدد القطع المدافعة عن مربع (قطع لون القطعة المُؤكَلة التي تهاجم المربع) */
+function countDefenders(fen, square){
+  try{
+    const stm=fen.split(' ')[1];               // الدور = اللاعب المُحرِّك
+    const defender = stm==='w'?'b':'w';        // لون القطعة المُؤكَلة (المدافعون)
+    const probePiece = stm==='w'?'N':'n';      // نضع حصاناً من لون المُحرِّك على المربع (قانوني بأي مربع)
+    const probe=setSquareInFen(fen, square, probePiece, defender);
+    const c=new Chess(); if(!c.load(probe)) return 0;
+    return c.moves({verbose:true}).filter(m=>m.to===square && m.captured).length;
+  }catch(e){ return 0; }
+}
 
 /* احتمال الفوز (win%) من سنتيبون (صيغة شبيهة بـ Lichess) */
 function winPercent(cp){ const x=Math.max(-1500,Math.min(1500,cp)); return 50 + 50*(2/(1+Math.exp(-0.00368208*x)) - 1); }
@@ -1598,21 +1622,37 @@ async function findBrilliantMoves(){
   const brilliant=[], great=[];
   for(const e of evals){
     const cpPlayed=e.cp; const cpl=Math.max(0,cpBest-cpPlayed); const isBest=(e.uci===bestUci);
-    const sac=sacrificeInfo(fen, e.m); // {isSac, amount, net}
-    // --- Brilliant: تضحية مادية تبقى ضمن الأفضل ولا تخسر الأفضلية ---
-    if(sac.isSac && sac.amount>=100 && cpl<=80 && cpPlayed>=-100){
-      brilliant.push({...e, key:'Brilliant', sac, why:`تضحية بـ ${(sac.amount/100).toFixed(1)} وحدة مادية مع بقائها ضمن الأفضل (فقد ${cpl} سنتيبون فقط، التقييم ${(cpPlayed/100).toFixed(2)})`});
+    const sac=sacrificeInfo(fen, e.m);                          // {isSac, amount, net}
+    const seeVal = e.m.captured ? see(fen, e.m.to) : null;      // مكسب المهاجم على المربع (>=0 ؛ >0 يعني أكل رابح)
+    const defenders = e.m.captured ? countDefenders(fen, e.m.to) : 0;
+
+    // ── شرط A: التضحية الكلاسيكية ──
+    const condA = sac.isSac && sac.amount>=100 && cpPlayed>=-150 && cpl<=100;
+    // ── شرط B: الأكل الخفي (المربع يبدو محمياً لكنه ليس كذلك فعلاً) ──
+    //   ملاحظة: دالة see هنا تُرجع مكسب المهاجم (>=0)، لذا "أكل سليم/رابح" = seeVal>=0
+    //   (صحّحنا اتجاه المقارنة عن المواصفة الأصلية التي افترضت seeVal<=0).
+    const condB = e.m.captured && !sac.isSac && defenders>=1 && seeVal>=0
+                  && cpPlayed>=cpBest-80 && cpPlayed>=-50;
+    // ── شرط C: المفاجأة الاستراتيجية الهادئة ──
+    const condC = !e.m.captured && sac.isSac && cpPlayed>=cpBest-50 && gap>=150 && cpPlayed>=0;
+
+    if(condA||condB||condC){
+      let why='';
+      if(condA) why=`تضحية بـ ${(sac.amount/100).toFixed(1)} وحدة مادية مع بقاء الأفضلية (فقد ${cpl} سنتيبون)`;
+      else if(condB) why=`أكل خفي: المربع يبدو محمياً (${defenders} مدافع) لكنه غير محمي فعلاً`;
+      else why=`نقلة هادئة استراتيجية نادرة تتفوّق بـ ${Math.min(gap,99999)} سنتيبون`;
+      brilliant.push({...e, key:'Brilliant', sac, seeVal, condB, why});
       continue;
     }
-    // --- Great شرط 1: أفضل نقلة وتتفوق بوضوح على البديل ---
-    if(isBest && gap>=100 && cpl<=50){
-      great.push({...e, key:'Great', sac, why:`أفضل نقلة وتتفوّق على البديل بـ ${Math.min(gap,99999)} سنتيبون`});
-      continue;
-    }
-    // --- Great شرط 2: أكلة استراتيجية قوية (ليست تضحية كلاسيكية) ---
-    if(e.m.captured && !sac.isSac && cpl<=30 && gap>=80 && isBest){
-      great.push({...e, key:'Great', sac, why:`أكلة استراتيجية قوية: أفضل نقلة بفارق ${Math.min(gap,99999)} سنتيبون عن البديل`});
-      continue;
+
+    // ── شرط D: Great كلاسيكي (أفضل نقلة بفارق واضح) ──
+    const condD = isBest && gap>=80 && cpl<=60;
+    // ── شرط E: أكل استراتيجي قوي ──
+    const condE = e.m.captured && isBest && cpl<=40 && gap>=60;
+    if(condD||condE){
+      const why = condD ? `أفضل نقلة بفارق ${Math.min(gap,99999)} سنتيبون`
+                        : `أكلة استراتيجية قوية بفارق ${Math.min(gap,99999)} سنتيبون`;
+      great.push({...e, key:'Great', sac, why});
     }
   }
 
@@ -1620,8 +1660,10 @@ async function findBrilliantMoves(){
   setPct(0.95);
   const fmtEval=cp=> Math.abs(cp)>=100000 ? (cp>0?'#':'-#') : ((cp>=0?'+':'')+(cp/100).toFixed(2));
   const card=(f)=>{ const ci=CLASS_INFO[f.key];
+    let seeNote='';
+    if(f.seeVal!=null && f.condB){ seeNote = f.seeVal>0 ? ` · SEE: مكسب ${(f.seeVal/100).toFixed(1)} للمهاجم` : ' · SEE: أكل متعادل (مربح للمهاجم)'; }
     return `<div class="brilliant-card"><span class="mvbig">${f.m.san}</span>`
-      +`<div style="font-size:11px;color:var(--text-dim)">تقييم بعد النقلة: <b dir="ltr">${fmtEval(f.cp)}</b> · ${f.why}</div>`
+      +`<div style="font-size:11px;color:var(--text-dim)">تقييم بعد النقلة: <b dir="ltr">${fmtEval(f.cp)}</b> · ${f.why}${seeNote}</div>`
       +`<span class="tag">${classChip(f.key)}</span></div>`; };
 
   let html='';
