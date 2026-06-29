@@ -305,8 +305,8 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:14px 0;}
       <label class="fld">PGN</label>
       <textarea id="pgnInput" placeholder="[Event ...] 1. e4 e5 2. Nf3 ..." rows="4"></textarea>
 
-      <label class="fld" data-i18n="t1_depth">عمق التحليل للمحرك: <b id="depthVal">3</b></label>
-      <input type="range" id="depthRange" min="2" max="4" value="3" style="width:100%" />
+      <label class="fld" data-i18n="t1_depth">مستوى التحليل (1 سريع … 5 أعمق): <b id="depthVal">3</b></label>
+      <input type="range" id="depthRange" min="1" max="5" value="3" style="width:100%" />
 
       <div class="btn-row">
         <button class="btn" id="analyzeBtn">⚙️ <span data-i18n="t1_analyze">تحليل المباراة</span></button>
@@ -367,8 +367,8 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:14px 0;}
         <button class="btn ghost" id="clearBoardBtn" data-i18n="clearBoard">تفريغ الرقعة</button>
       </div>
 
-      <label class="fld" data-i18n="t2_depth">عمق البحث: <b id="depthVal2">4</b></label>
-      <input type="range" id="depthRange2" min="2" max="5" value="4" style="width:100%" />
+      <label class="fld" data-i18n="t2_depth">مستوى البحث (1 سريع … 5 أعمق): <b id="depthVal2">5</b></label>
+      <input type="range" id="depthRange2" min="1" max="5" value="5" style="width:100%" />
 
       <div class="btn-row">
         <button class="btn" id="findBtn">✨ <span data-i18n="t2_find">ابحث عن النقلات الرائعة</span></button>
@@ -825,43 +825,43 @@ const PIECE_VALUE = {p:100,n:300,b:330,r:500,q:900,k:20000};
 /* ---------- الترجمة (عربي/إنجليزي) ---------- */
 const I18N = {
   ar:{
-    appTitle:"محلل الشطرنج",appSub:"محرك داخلي يعمل بدون إنترنت",
+    appTitle:"محلل الشطرنج",appSub:"Stockfish محلي — بدون إنترنت",
     t1_title:"تحليل مباراة",t1_hint:"الصق رابط مباراة من Lichess (يُجلب تلقائياً) أو رابط Chess.com، أو الصق نص الـ PGN مباشرة. ثم اضغط تحليل.",
-    t1_url:"رابط المباراة (Lichess / Chess.com)",t1_fetch:"جلب الـPGN",t1_depth:"عمق التحليل للمحرك:",t1_analyze:"تحليل المباراة",stop:"إيقاف",
+    t1_url:"رابط المباراة (Lichess / Chess.com)",t1_fetch:"جلب الـPGN",t1_depth:"مستوى التحليل (1 سريع … 5 أعمق):",t1_analyze:"تحليل المباراة",stop:"إيقاف",
     summary:"ملخص التحليل",white:"الأبيض",black:"الأسود",accuracy:"الدقة",
     approxNote:"⚠️ التصنيفات (خصوصاً Brilliant وGreat) تقريبية ومبنية على منطق حسابي فوق تقييمات المحرك الداخلي، وقد تختلف عن نظام chess.com الرسمي غير المعلن.",
     t2_title:"الباحث عن النقلة العبقرية",t2_hint:"رتّب القطع بحرية (اسحب وأفلِت)، اختر دور اللعب، ثم اضغط «بحث» ليُظهر فقط Brilliant (‼) أو Great (!).",
     whiteToMove:"دور الأبيض",blackToMove:"دور الأسود",startPos:"الوضع الابتدائي",clearBoard:"تفريغ الرقعة",
-    t2_depth:"عمق البحث:",t2_find:"ابحث عن النقلات الرائعة",
+    t2_depth:"مستوى البحث (1 سريع … 5 أعمق):",t2_find:"ابحث عن النقلات الرائعة",
     approxNote2:"⚠️ تعريف Brilliant/Great غير موثّق رسمياً. هنا: Brilliant = تضحية مادية تظل من أفضل النقلات وتحافظ على أفضلية، وGreat = النقلة الجيدة الوحيدة تقريباً في موقف حرج.",
     t3_title:"لغز اليوم التكتيكي",t3_hint:"لغز يومي من Lichess. جِد أفضل نقلة ونفّذها على الرقعة.",t3_load:"تحميل لغز اليوم",
     t4_title:"سجل التحليلات",t4_hint:"تُحفظ تحليلاتك محلياً في متصفحك. اضغط على أي عنصر لإعادة تحميله.",
     t5_title:"تخصيص المظهر",t5_hint:"غيّر ألوان الموقع ولون الرقعة. تُحفظ تلقائياً.",
     c_primary:"الأساسي",c_primary2:"الأساسي الفاتح",c_accent:"التمييز",c_bg:"الخلفية",c_surface:"البطاقات",c_blight:"الرقعة فاتح",c_bdark:"الرقعة غامق",
     language:"اللغة",resetTheme:"إعادة الضبط الافتراضي",about:"حول",
-    aboutText:"ملف HTML واحد يعمل بالكامل في المتصفح مع محرك شطرنج داخلي مدمج (بدون أي مكتبة خارجية)، لذا يعمل التحليل حتى بدون إنترنت. واجهات Lichess/Chess.com تُستخدم فقط لجلب المباريات واللغز عند توفر الإنترنت.",
-    engineNote:"المحرك ونواة الشطرنج مدمجان داخل الملف ويعملان أوفلاين. الإنترنت مطلوب فقط لجلب مباريات Lichess/Chess.com ولغز اليوم.",
+    aboutText:"ملف HTML واحد يعمل في المتصفح. يستخدم محرك Stockfish المحلي (stockfish.js/stockfish.wasm) الموجود بجانب الملف لأقصى قوة، ويملك محركاً داخلياً مدمجاً كبديل. لا يحتاج إنترنت للتحليل.",
+    engineNote:"يُحمَّل Stockfish من ملفّيه المحلّيين بجانب index.html (بدون إنترنت/CDN). إن لم يتوفّرا يعمل المحرك الداخلي المدمج. الإنترنت مطلوب فقط لجلب مباريات Lichess/Chess.com ولغز اليوم.",
     tab1:"تحليل",tab2:"العبقرية",tab3:"لغز",tab4:"السجل",tab5:"إعدادات",
     Brilliant:"عبقرية",Great:"رائعة",Best:"الأفضل",Excellent:"ممتازة",Good:"جيدة",Book:"افتتاحية",Inaccuracy:"عدم دقة",Mistake:"خطأ",Blunder:"خطأ فادح",
     moves:"نقلات",blunders:"أخطاء فادحة",
   },
   en:{
-    appTitle:"Chess Analyzer",appSub:"Built-in engine, works offline",
+    appTitle:"Chess Analyzer",appSub:"Local Stockfish — no internet",
     t1_title:"Analyze a Game",t1_hint:"Paste a Lichess game URL (auto-fetched) or a Chess.com URL, or paste PGN directly. Then press Analyze.",
-    t1_url:"Game URL (Lichess / Chess.com)",t1_fetch:"Fetch PGN",t1_depth:"Engine depth:",t1_analyze:"Analyze Game",stop:"Stop",
+    t1_url:"Game URL (Lichess / Chess.com)",t1_fetch:"Fetch PGN",t1_depth:"Analysis level (1 fast … 5 deepest):",t1_analyze:"Analyze Game",stop:"Stop",
     summary:"Analysis Summary",white:"White",black:"Black",accuracy:"Accuracy",
     approxNote:"⚠️ Classifications (especially Brilliant & Great) are approximate heuristics over the built-in engine's evaluations and may differ from Chess.com's undisclosed system.",
     t2_title:"Brilliant Move Finder",t2_hint:"Arrange pieces freely (drag & drop), pick side to move, then press Find to show only Brilliant (‼) or Great (!) moves.",
     whiteToMove:"White to move",blackToMove:"Black to move",startPos:"Start position",clearBoard:"Clear board",
-    t2_depth:"Search depth:",t2_find:"Find brilliant moves",
+    t2_depth:"Search level (1 fast … 5 deepest):",t2_find:"Find brilliant moves",
     approxNote2:"⚠️ Brilliant/Great are not officially documented. Here: Brilliant = a material sacrifice that is still among the best moves and keeps an advantage; Great = the near-only good move in a critical position.",
     t3_title:"Daily Tactics Puzzle",t3_hint:"Daily puzzle from Lichess. Find the best move and play it on the board.",t3_load:"Load today's puzzle",
     t4_title:"Analysis History",t4_hint:"Your analyses are saved locally in your browser. Tap any item to reload.",
     t5_title:"Customize Appearance",t5_hint:"Change site colors and board colors. Saved automatically.",
     c_primary:"Primary",c_primary2:"Primary light",c_accent:"Accent",c_bg:"Background",c_surface:"Cards",c_blight:"Board light",c_bdark:"Board dark",
     language:"Language",resetTheme:"Reset to default",about:"About",
-    aboutText:"A single HTML file running fully in the browser with a built-in chess engine (no external libraries), so analysis works even offline. The Lichess/Chess.com APIs are only used to fetch games and the daily puzzle when online.",
-    engineNote:"The engine and chess core are embedded in the file and run offline. Internet is only needed to fetch Lichess/Chess.com games and the daily puzzle.",
+    aboutText:"A single HTML file running in the browser. It uses the local Stockfish (stockfish.js/stockfish.wasm) placed next to the file for maximum strength, with a built-in engine as fallback. No internet needed for analysis.",
+    engineNote:"Stockfish loads from its two local files next to index.html (no internet/CDN). If they are missing, the built-in engine is used. Internet is only needed to fetch Lichess/Chess.com games and the daily puzzle.",
     tab1:"Analyze",tab2:"Brilliant",tab3:"Puzzle",tab4:"History",tab5:"Settings",
     Brilliant:"Brilliant",Great:"Great",Best:"Best",Excellent:"Excellent",Good:"Good",Book:"Book",Inaccuracy:"Inaccuracy",Mistake:"Mistake",Blunder:"Blunder",
     moves:"moves",blunders:"blunders",
@@ -1116,36 +1116,86 @@ let board1=null, board2=null, board3=null;
 
 <script>
 /* =====================================================================
-   3) المحرك الداخلي المدمج (Web Worker) — يعمل بالكامل أوفلاين
-   - مصدر المحرك + نواة الشطرنج مدمجان في وسم <script id="worker-lib">.
-   - واجهة وعود (Promise) مع طابور وتقدّم لحظي (onProgress من 0 إلى 1).
+   3) المحرك: Stockfish محلي (نفس المجلد) + محرك داخلي احتياطي
+   - يُحاول أولاً تشغيل ملفّي stockfish.js/stockfish.wasm المرفوعين بجانب
+     index.html (بدون إنترنت/CDN، يعملان عبر GitHub Pages أو أي خادم ساكن).
+   - إن تعذّر، يستخدم المحرك الداخلي المدمج (يعمل حتى من ملف محلي file://).
+   - الواجهة موحّدة: analyzeGame / analyzeFind تُرجعان {bestmove, lines:[{move,cp,mate,pv}]}.
    ===================================================================== */
 function scoreToCp(o){ // التقييم بالسنتيبون (نسبةً لمن عليه الدور)؛ المات يُمثَّل برقم كبير
   if(o.mate!=null){ return (o.mate>0?1:-1)*(1000000 - Math.abs(o.mate)*1000); }
   return o.cp;
 }
+const SF_PATHS=['stockfish.js','./stockfish.js','stockfish/stockfish.js'];
 class Engine{
-  constructor(){ this.worker=null; this._cbs={}; this._id=0; this._queue=Promise.resolve(); }
-  _ensure(){
-    if(this.worker) return;
-    const src=document.getElementById('worker-lib').textContent;
-    const blob=new Blob([src],{type:'application/javascript'});
-    this.worker=new Worker(URL.createObjectURL(blob));
-    this.worker.onmessage=(e)=>{
-      const d=e.data; const cb=this._cbs[d.id]; if(!cb) return;
-      if(d.type==='progress'){ if(cb.onProgress) cb.onProgress(d.frac); }
-      else if(d.type==='result'){ cb.resolve(d); delete this._cbs[d.id]; }
-    };
-    this.worker.onerror=(e)=>{ console.error('Engine worker error',e.message); };
-  }
-  async init(onStatus){ try{ this._ensure(); if(onStatus)onStatus(''); }catch(err){ throw new Error('تعذّر بدء المحرك الداخلي: '+(err&&err.message)); } }
-  stop(){ /* الإيقاف يتم عبر stopFlag بين الوضعيات؛ لا نُنهي العامل */ }
+  constructor(){ this.mode=null; this.modeName=''; this.sf=null; this.jsW=null; this._sfHandler=null; this._cbs={}; this._id=0; this._queue=Promise.resolve(); this._inited=false; }
 
-  /* تحليل وضعية: يرجع {bestmove, lines:[{move(uci),cp,pv[]}]} مرتبة من الأفضل */
-  analyze(fen,{depth=3,onProgress}={}){
-    const run=()=>new Promise((resolve)=>{ this._ensure(); const id=++this._id; this._cbs[id]={resolve,onProgress}; this.worker.postMessage({id,fen,depth}); });
-    this._queue=this._queue.then(run,run);
-    return this._queue;
+  /* ---- بدء Stockfish المحلي ---- */
+  _startSF(path){
+    return new Promise((resolve,reject)=>{
+      let w; try{ w=new Worker(path); }catch(e){ return reject(e); }
+      let done=false; const to=setTimeout(()=>{ if(!done){done=true; try{w.terminate();}catch(e){} reject(new Error('timeout')); } }, 9000);
+      w.onmessage=(ev)=>{ const l=typeof ev.data==='string'?ev.data:(ev.data&&ev.data.data)||'';
+        if(l.indexOf('uciok')>=0){ w.postMessage('isready'); }
+        else if(l.indexOf('readyok')>=0){ if(!done){ done=true; clearTimeout(to); this.sf=w; resolve(); } } };
+      w.onerror=(e)=>{ if(!done){ done=true; clearTimeout(to); reject(new Error('sf error: '+(e.message||''))); } };
+      setTimeout(()=>{ try{ w.postMessage('uci'); }catch(e){} },30);
+    });
+  }
+  _attachSF(){
+    this.sf.onmessage=(ev)=>{ const l=typeof ev.data==='string'?ev.data:(ev.data&&ev.data.data)||''; if(this._sfHandler) this._sfHandler(l); };
+    try{ this.sf.postMessage('setoption name Threads value '+Math.max(1,(navigator.hardwareConcurrency||2)-1)); this.sf.postMessage('setoption name Hash value 64'); }catch(e){}
+  }
+  /* ---- المحرك الداخلي ---- */
+  _ensureJS(){
+    if(this.jsW) return;
+    const src=document.getElementById('worker-lib').textContent;
+    this.jsW=new Worker(URL.createObjectURL(new Blob([src],{type:'application/javascript'})));
+    this.jsW.onmessage=(e)=>{ const d=e.data; const cb=this._cbs[d.id]; if(!cb)return; if(d.type==='progress'){ cb.onProgress&&cb.onProgress(d.frac); } else if(d.type==='result'){ cb.resolve(d); delete this._cbs[d.id]; } };
+    this.jsW.onerror=(e)=>console.error('JS engine error',e.message);
+  }
+
+  async init(onStatus){
+    if(this._inited) return;
+    for(const p of SF_PATHS){ try{ await this._startSF(p); this.mode='sf'; this._attachSF(); this.modeName='Stockfish (محلي)'; break; }catch(e){ try{this.sf&&this.sf.terminate();}catch(_){ } this.sf=null; } }
+    if(this.mode!=='sf'){ this.mode='js'; this._ensureJS(); this.modeName='المحرك الداخلي'; }
+    this._inited=true; if(onStatus)onStatus(this.modeName);
+  }
+  stop(){ /* الإيقاف عبر stopFlag بين الوضعيات */ }
+  _enqueue(fn){ this._queue=this._queue.then(fn,fn); return this._queue; }
+
+  /* تحليل Stockfish (UCI + MultiPV) مع ميزانية وقت أو عمق */
+  _sfAnalyze(fen,{depth,movetime,multipv=1,onProgress}){
+    return new Promise((resolve)=>{
+      const lines={}; const start=Date.now(); const target=depth||30;
+      this._sfHandler=(l)=>{
+        if(l.indexOf('info')===0 && l.indexOf(' pv ')>=0 && l.indexOf('score')>=0){
+          const mp=l.match(/multipv (\d+)/); const idx=mp?+mp[1]:1;
+          const cp=l.match(/score cp (-?\d+)/); const mate=l.match(/score mate (-?\d+)/); const dM=l.match(/ depth (\d+)/);
+          const pv=l.split(' pv ')[1].trim().split(/\s+/);
+          lines[idx]={multipv:idx, move:pv[0], cp:cp?+cp[1]:null, mate:mate?+mate[1]:null, depth:dM?+dM[1]:0, pv};
+          if(onProgress){ if(movetime) onProgress(Math.min(0.99,(Date.now()-start)/movetime)); else if(dM) onProgress(Math.min(0.99,(+dM[1])/target)); }
+        } else if(l.indexOf('bestmove')===0){ const bm=l.split(/\s+/)[1]; this._sfHandler=null; if(onProgress)onProgress(1);
+          resolve({bestmove:bm, lines:Object.values(lines).sort((a,b)=>a.multipv-b.multipv)}); }
+      };
+      this.sf.postMessage('setoption name MultiPV value '+multipv);
+      this.sf.postMessage('position fen '+fen);
+      this.sf.postMessage(movetime?('go movetime '+movetime):('go depth '+(depth||16)));
+    });
+  }
+  /* تحليل المحرك الداخلي */
+  _jsAnalyze(fen,{depth,onProgress}){
+    return new Promise((resolve)=>{ this._ensureJS(); const id=++this._id; this._cbs[id]={resolve,onProgress}; this.jsW.postMessage({id,fen,depth}); });
+  }
+
+  /* ---- واجهات عُليا حسب المستوى (1..5) ---- */
+  analyzeGame(fen, level, onProgress){
+    if(this.mode==='sf') return this._enqueue(()=>this._sfAnalyze(fen,{depth:10+level*2, multipv:2, onProgress}));
+    return this._enqueue(()=>this._jsAnalyze(fen,{depth:Math.min(4,level), onProgress}));
+  }
+  analyzeFind(fen, level, legalCount, onProgress){
+    if(this.mode==='sf') return this._enqueue(()=>this._sfAnalyze(fen,{movetime:Math.min(4500,level*900), multipv:Math.min(legalCount||1,64), onProgress}));
+    return this._enqueue(()=>this._jsAnalyze(fen,{depth:Math.min(5,level), onProgress}));
   }
 }
 const engine = new Engine();
@@ -1331,9 +1381,9 @@ async function analyzeGame(){
   $('#analyzeBtn').disabled=true; $('#stopBtn').style.display='';
   $('#analyzeProgWrap').style.display=''; $('#analyzeProg').style.width='0%';
   const st=$('#analyzeStatus');
-  const depth=+$('#depthRange').value;
+  const level=+$('#depthRange').value;
 
-  try{ await engine.init(m=>{ if(m) st.innerHTML='<div class="spinner"></div> '+m; }); }
+  try{ await engine.init(name=>{ st.innerHTML='<div class="spinner"></div> المحرك: '+name; }); }
   catch(err){ st.textContent='⚠️ '+err.message; analyzing=false; $('#analyzeBtn').disabled=false; $('#stopBtn').style.display='none'; return; }
 
   // تحليل كل وضعية (المحرك يقيّم جميع النقلات الجذرية، فنحصل على الأفضل والثاني)
@@ -1346,8 +1396,8 @@ async function analyzeGame(){
     // الأوضاع المنتهية (كش مات/تعادل) تُقيّم مباشرة دون المحرك
     let term=null; try{ const c=new Chess(fens[k]); if(c.game_over()){ term = c.in_checkmate() ? -1000000 : 0; } }catch(e){}
     if(term!==null){ posEval.push({cpBest:term, second:null, bestUci:null}); setPct((k+1)/total); continue; }
-    st.innerHTML=`<div class="spinner"></div> تحليل الوضعية ${k+1}/${total} …`;
-    const res=await engine.analyze(fens[k],{depth, onProgress:(f)=>setPct((k+f)/total)});
+    st.innerHTML=`<div class="spinner"></div> [${engine.modeName}] تحليل الوضعية ${k+1}/${total} …`;
+    const res=await engine.analyzeGame(fens[k], level, (f)=>setPct((k+f)/total));
     const l0=res.lines[0], l1=res.lines[1];
     posEval.push({ cpBest: l0?scoreToCp(l0):0, second: l1?scoreToCp(l1):null, bestUci: (l0&&l0.move)|| res.bestmove });
     setPct((k+1)/total);
@@ -1498,16 +1548,16 @@ async function findBrilliantMoves(){
   const legal=ch.moves({verbose:true});
   if(!legal.length){ toast('لا توجد نقلات قانونية (كش مات/تعادل)'); $('#findStatus').textContent='لا توجد نقلات.'; return; }
 
-  const st=$('#findStatus'); const depth=+$('#depthRange2').value;
+  const st=$('#findStatus'); const level=+$('#depthRange2').value;
   $('#findBtn').disabled=true; $('#findProgWrap').style.display=''; $('#findProg').style.width='0%';
   $('#findPct').style.display=''; $('#findPct').textContent='0%';
   clearFinderResults();
   try{ await engine.init(); }
   catch(err){ st.textContent='⚠️ '+err.message; $('#findBtn').disabled=false; $('#findProgWrap').style.display='none'; $('#findPct').style.display='none'; return; }
 
-  st.innerHTML='<div class="spinner"></div> يفحص المحرك جميع النقلات…';
+  st.innerHTML='<div class="spinner"></div> ['+engine.modeName+'] يفحص المحرك جميع النقلات…';
   const setPct=(f)=>{ const p=Math.round(f*100); $('#findProg').style.width=p+'%'; $('#findPct').textContent=p+'%'; };
-  const res=await engine.analyze(fen,{depth, onProgress:setPct});
+  const res=await engine.analyzeFind(fen, level, legal.length, setPct);
   setPct(1);
   const lines=res.lines; if(!lines.length){ st.textContent='تعذّر الحصول على نتائج.'; $('#findBtn').disabled=false; $('#findProgWrap').style.display='none'; $('#findPct').style.display='none'; return; }
   const cpBest=scoreToCp(lines[0]); const second=lines[1]?scoreToCp(lines[1]):null;
