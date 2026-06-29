@@ -164,10 +164,12 @@ textarea{resize:vertical;min-height:80px;direction:ltr;text-align:left;}
 .board .sq .coord.rank{top:0;left:2px;}
 .board .piece{
   position:absolute;width:12.5%;height:12.5%;
-  background-size:88%;background-repeat:no-repeat;background-position:center;
+  display:grid;place-items:center;font-size:0.82em;line-height:1;
   z-index:5;transition:left .22s ease,top .22s ease;will-change:left,top;
-  touch-action:none;
+  touch-action:none;cursor:grab;
 }
+.board .piece.w{color:#f7f7f2;text-shadow:0 0 2px #000,0 1px 2px rgba(0,0,0,.7),1px 0 1px #000,-1px 0 1px #000;}
+.board .piece.b{color:#2a2a2e;text-shadow:0 0 2px rgba(255,255,255,.55),0 1px 2px rgba(0,0,0,.5);}
 .board .piece.dragging{z-index:30;transition:none;cursor:grabbing;filter:drop-shadow(0 6px 8px rgba(0,0,0,.5));}
 .board .hl-from,.board .hl-to{position:absolute;width:12.5%;height:12.5%;background:rgba(240,168,48,.45);z-index:2;}
 .board .hint-dot{position:absolute;width:12.5%;height:12.5%;z-index:3;pointer-events:none;}
@@ -228,8 +230,10 @@ textarea{resize:vertical;min-height:80px;direction:ltr;text-align:left;}
 .palette{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:10px;}
 .palette .pp{
   aspect-ratio:1/1;border-radius:10px;background:var(--bg-2);border:1px solid var(--border);
-  background-size:80%;background-repeat:no-repeat;background-position:center;touch-action:none;
+  display:grid;place-items:center;font-size:24px;line-height:1;touch-action:none;
 }
+.palette .pp.w{color:#f7f7f2;text-shadow:0 0 2px #000,0 1px 2px rgba(0,0,0,.7);}
+.palette .pp.b{color:#2a2a2e;text-shadow:0 0 2px rgba(255,255,255,.55);}
 .palette .pp.sel{border-color:var(--primary-2);box-shadow:0 0 0 2px var(--primary-2) inset;}
 .palette .pp.trash{display:grid;place-items:center;font-size:20px;color:var(--c-blunder);background:var(--surface-2);}
 
@@ -301,8 +305,8 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:14px 0;}
       <label class="fld">PGN</label>
       <textarea id="pgnInput" placeholder="[Event ...] 1. e4 e5 2. Nf3 ..." rows="4"></textarea>
 
-      <label class="fld" data-i18n="t1_depth">عمق التحليل للمحرك: <b id="depthVal">12</b></label>
-      <input type="range" id="depthRange" min="8" max="20" value="12" style="width:100%" />
+      <label class="fld" data-i18n="t1_depth">عمق التحليل للمحرك: <b id="depthVal">3</b></label>
+      <input type="range" id="depthRange" min="2" max="4" value="3" style="width:100%" />
 
       <div class="btn-row">
         <button class="btn" id="analyzeBtn">⚙️ <span data-i18n="t1_analyze">تحليل المباراة</span></button>
@@ -310,6 +314,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:14px 0;}
       </div>
       <div class="statusbar" id="analyzeStatus"></div>
       <div class="progress" id="analyzeProgWrap" style="display:none"><div id="analyzeProg"></div></div>
+      <div id="analyzePct" style="display:none;text-align:center;font-weight:800;font-size:13px;margin-top:6px;color:var(--primary-2)">0%</div>
     </div>
 
     <div class="card" id="boardCard1" style="display:none">
@@ -362,14 +367,15 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:14px 0;}
         <button class="btn ghost" id="clearBoardBtn" data-i18n="clearBoard">تفريغ الرقعة</button>
       </div>
 
-      <label class="fld" data-i18n="t2_depth">عمق البحث: <b id="depthVal2">16</b></label>
-      <input type="range" id="depthRange2" min="10" max="22" value="16" style="width:100%" />
+      <label class="fld" data-i18n="t2_depth">عمق البحث: <b id="depthVal2">4</b></label>
+      <input type="range" id="depthRange2" min="2" max="5" value="4" style="width:100%" />
 
       <div class="btn-row">
         <button class="btn" id="findBtn">✨ <span data-i18n="t2_find">ابحث عن النقلات الرائعة</span></button>
       </div>
       <div class="statusbar" id="findStatus"></div>
       <div class="progress" id="findProgWrap" style="display:none"><div id="findProg"></div></div>
+      <div id="findPct" style="display:none;text-align:center;font-weight:800;font-size:13px;margin-top:6px;color:var(--primary-2)">0%</div>
       <div id="brilliantResults"></div>
       <div class="note" data-i18n="approxNote2">⚠️ تعريف Brilliant/Great غير موثّق رسمياً من chess.com. هنا نعتبر النقلة Brilliant إذا كانت تضحية مادية (sacrifice) وتظل من أفضل النقلات وتحافظ على أفضلية، وGreat إذا كانت النقلة الجيدة الوحيدة تقريباً في موقف حرج.</div>
     </div>
@@ -440,8 +446,368 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:14px 0;}
 
 <div class="toast" id="toast"></div>
 
-<!-- مكتبة chess.js لتوليد/التحقق من النقلات -->
-<script src="https://cdn.jsdelivr.net/npm/chess.js@0.13.4/chess.js"></script>
+<!-- نواة الشطرنج الكاملة مدمجة داخل الملف (تعمل بدون إنترنت، بدون أي مكتبة خارجية) -->
+<script>
+window.Chess=(function(){
+/* Self-contained 0x88 chess core (drop-in subset of chess.js API) */
+'use strict';
+const EMPTY=0, P=1,N=2,B=3,R=4,Q=5,K=6;
+const WK=1,WQ=2,BK=4,BQ=8;
+const KN_OFF=[-18,-33,-31,-14,18,33,31,14];
+const B_OFF=[-17,-15,17,15];
+const R_OFF=[-16,16,-1,1];
+const K_OFF=[-17,-16,-15,-1,1,15,16,17];
+const FILES=['a','b','c','d','e','f','g','h'];
+function f_(sq){return sq&7;} function r_(sq){return sq>>4;}
+function alg(sq){return FILES[f_(sq)]+(r_(sq)+1);}
+function sqFromAlg(s){return (parseInt(s[1])-1)*16 + FILES.indexOf(s[0]);}
+function onBoard(sq){return (sq&0x88)===0;}
+const SYM={1:'p',2:'n',3:'b',4:'r',5:'q',6:'k'};
+const FROMSYM={p:1,n:2,b:3,r:4,q:5,k:6};
+
+class Chess{
+  constructor(fen){ this.headers={}; this.reset(); if(fen){ this.load(fen);} else { this.load('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'); } }
+  reset(){ this.board=new Int8Array(128); this._turn='w'; this.castling=0; this.ep=-1; this.half=0; this.moveno=1; this.kings={w:-1,b:-1}; this._hist=[]; this._sans=[]; }
+  validate_fen(fen){
+    const parts=fen.trim().split(/\s+/); if(parts.length<4) return {valid:false,error:'حقول ناقصة'};
+    const rows=parts[0].split('/'); if(rows.length!==8) return {valid:false,error:'عدد الصفوف غير صحيح'};
+    for(const row of rows){ let c=0; for(const ch of row){ if(/\d/.test(ch))c+=+ch; else if(/[prnbqkPRNBQK]/.test(ch))c++; else return {valid:false,error:'حرف غير صالح'}; } if(c!==8) return {valid:false,error:'صف بطول خاطئ'}; }
+    if(!/^[wb]$/.test(parts[1])) return {valid:false,error:'دور غير صحيح'};
+    return {valid:true,error:null};
+  }
+  load(fen){
+    const v=this.validate_fen(fen); if(!v.valid) return false;
+    this.reset();
+    const parts=fen.trim().split(/\s+/); const rows=parts[0].split('/');
+    for(let r=0;r<8;r++){ let file=0; for(const ch of rows[r]){ if(/\d/.test(ch)){file+=+ch;} else { const color=ch===ch.toUpperCase()?1:-1; const t=FROMSYM[ch.toLowerCase()]; const sq=(7-r)*16+file; this.board[sq]=color*t; if(t===K){ this.kings[color===1?'w':'b']=sq; } file++; } } }
+    this._turn=parts[1];
+    if(parts[2]&&parts[2]!=='-'){ if(parts[2].includes('K'))this.castling|=WK; if(parts[2].includes('Q'))this.castling|=WQ; if(parts[2].includes('k'))this.castling|=BK; if(parts[2].includes('q'))this.castling|=BQ; }
+    this.ep = (parts[3]&&parts[3]!=='-')?sqFromAlg(parts[3]):-1;
+    this.half = parts[4]?parseInt(parts[4]):0; this.moveno=parts[5]?parseInt(parts[5]):1;
+    return true;
+  }
+  fen(){
+    let s=''; for(let r=7;r>=0;r--){ let empty=0; for(let f=0;f<8;f++){ const pc=this.board[r*16+f]; if(pc===0){empty++;} else { if(empty){s+=empty;empty=0;} let l=SYM[Math.abs(pc)]; s+= pc>0?l.toUpperCase():l; } } if(empty)s+=empty; if(r)s+='/'; }
+    let cr=''; if(this.castling&WK)cr+='K'; if(this.castling&WQ)cr+='Q'; if(this.castling&BK)cr+='k'; if(this.castling&BQ)cr+='q'; if(!cr)cr='-';
+    return s+' '+this._turn+' '+cr+' '+(this.ep>=0?alg(this.ep):'-')+' '+this.half+' '+this.moveno;
+  }
+  turnColor(){ return this._turn==='w'?1:-1; }
+  turn(){ return this._turn; }
+  _isAttacked(sq, bySign){
+    if(bySign===1){ if(onBoard(sq-17)&&this.board[sq-17]===P) return true; if(onBoard(sq-15)&&this.board[sq-15]===P) return true; }
+    else { if(onBoard(sq+17)&&this.board[sq+17]===-P) return true; if(onBoard(sq+15)&&this.board[sq+15]===-P) return true; }
+    for(const o of KN_OFF){ const t=sq+o; if(onBoard(t)&&this.board[t]===bySign*N) return true; }
+    for(const o of K_OFF){ const t=sq+o; if(onBoard(t)&&this.board[t]===bySign*K) return true; }
+    for(const o of B_OFF){ let t=sq+o; while(onBoard(t)){ const pc=this.board[t]; if(pc!==0){ if(pc===bySign*B||pc===bySign*Q) return true; break; } t+=o; } }
+    for(const o of R_OFF){ let t=sq+o; while(onBoard(t)){ const pc=this.board[t]; if(pc!==0){ if(pc===bySign*R||pc===bySign*Q) return true; break; } t+=o; } }
+    return false;
+  }
+  in_check(){ const us=this.turnColor(); const ks=this.kings[this._turn]; return this._isAttacked(ks, -us); }
+  _genPseudo(onlyFrom){
+    const us=this.turnColor(); const moves=[];
+    const add=(from,to,flags,promo)=>{ moves.push({from,to,flags,promotion:promo}); };
+    for(let sq=0;sq<128;sq++){ if(!onBoard(sq))continue; const pc=this.board[sq]; if(pc===0||Math.sign(pc)!==us)continue; if(onlyFrom!=null&&sq!==onlyFrom)continue; const t=Math.abs(pc);
+      if(t===P){ const dir=us===1?16:-16; const startRank=us===1?1:6; const promoRank=us===1?6:1;
+        const one=sq+dir; if(onBoard(one)&&this.board[one]===0){ if(r_(sq)===promoRank){ for(const pr of [Q,R,B,N]) add(sq,one,'np',pr);} else { add(sq,one,'n'); if(r_(sq)===startRank){ const two=sq+2*dir; if(this.board[two]===0) add(sq,two,'b'); } } }
+        for(const dc of [dir-1,dir+1]){ const tt=sq+dc; if(!onBoard(tt))continue; const cap=this.board[tt]; if(cap!==0&&Math.sign(cap)===-us){ if(r_(sq)===promoRank){ for(const pr of [Q,R,B,N]) add(sq,tt,'cp',pr);} else add(sq,tt,'c'); } else if(tt===this.ep){ add(sq,tt,'e'); } }
+      } else if(t===N){ for(const o of KN_OFF){ const tt=sq+o; if(!onBoard(tt))continue; const cap=this.board[tt]; if(cap===0)add(sq,tt,'n'); else if(Math.sign(cap)===-us)add(sq,tt,'c'); } }
+      else if(t===K){ for(const o of K_OFF){ const tt=sq+o; if(!onBoard(tt))continue; const cap=this.board[tt]; if(cap===0)add(sq,tt,'n'); else if(Math.sign(cap)===-us)add(sq,tt,'c'); }
+        if(us===1&&sq===4){ if((this.castling&WK)&&this.board[5]===0&&this.board[6]===0&&this.board[7]===R&&!this._isAttacked(4,-1)&&!this._isAttacked(5,-1)&&!this._isAttacked(6,-1)) add(4,6,'k'); if((this.castling&WQ)&&this.board[3]===0&&this.board[2]===0&&this.board[1]===0&&this.board[0]===R&&!this._isAttacked(4,-1)&&!this._isAttacked(3,-1)&&!this._isAttacked(2,-1)) add(4,2,'q'); }
+        if(us===-1&&sq===116){ if((this.castling&BK)&&this.board[117]===0&&this.board[118]===0&&this.board[119]===-R&&!this._isAttacked(116,1)&&!this._isAttacked(117,1)&&!this._isAttacked(118,1)) add(116,118,'k'); if((this.castling&BQ)&&this.board[115]===0&&this.board[114]===0&&this.board[113]===0&&this.board[112]===-R&&!this._isAttacked(116,1)&&!this._isAttacked(115,1)&&!this._isAttacked(114,1)) add(116,114,'q'); }
+      } else { const offs = t===B?B_OFF:t===R?R_OFF:K_OFF; for(const o of offs){ let tt=sq+o; while(onBoard(tt)){ const cap=this.board[tt]; if(cap===0)add(sq,tt,'n'); else { if(Math.sign(cap)===-us)add(sq,tt,'c'); break; } tt+=o; } } }
+    }
+    return moves;
+  }
+  _makeRaw(m){
+    const us=this.turnColor(); const piece=this.board[m.from]; const undo={m, captured:0, capSq:-1, castling:this.castling, ep:this.ep, half:this.half, moveno:this.moveno, king:this.kings[this._turn]};
+    this.ep=-1;
+    if(m.flags.includes('e')){ const capSq=m.to-(us===1?16:-16); undo.captured=this.board[capSq]; undo.capSq=capSq; this.board[capSq]=0; }
+    else if(this.board[m.to]!==0){ undo.captured=this.board[m.to]; undo.capSq=m.to; }
+    this.board[m.to]=piece; this.board[m.from]=0;
+    if(m.promotion){ this.board[m.to]=us*m.promotion; }
+    if(Math.abs(piece)===K){ this.kings[this._turn]=m.to; if(m.flags.includes('k')){ this.board[m.to-1]=us*R; this.board[m.to+1]=0; } if(m.flags.includes('q')){ this.board[m.to+1]=us*R; this.board[m.to-2]=0; } }
+    if(m.flags.includes('b')) this.ep=m.from+(us===1?16:-16);
+    if(piece===K){ this.castling&=~(WK|WQ);} if(piece===-K){ this.castling&=~(BK|BQ);}
+    if(m.from===0||m.to===0)this.castling&=~WQ; if(m.from===7||m.to===7)this.castling&=~WK; if(m.from===112||m.to===112)this.castling&=~BQ; if(m.from===119||m.to===119)this.castling&=~BK;
+    this.half = (Math.abs(piece)===P||undo.captured!==0)?0:this.half+1;
+    if(this._turn==='b')this.moveno++;
+    this._turn = this._turn==='w'?'b':'w';
+    this._hist.push(undo); return undo;
+  }
+  _unmakeRaw(){
+    const undo=this._hist.pop(); if(!undo)return; const m=undo.m;
+    this._turn=this._turn==='w'?'b':'w'; const us=this.turnColor();
+    this.castling=undo.castling; this.ep=undo.ep; this.half=undo.half; this.moveno=undo.moveno; this.kings[this._turn]=undo.king;
+    let piece=this.board[m.to];
+    if(m.promotion){ piece=us*P; }
+    this.board[m.from]=piece; this.board[m.to]=0;
+    if(Math.abs(piece)===K){ this.kings[this._turn]=m.from; if(m.flags.includes('k')){ this.board[m.to+1]=us*R; this.board[m.to-1]=0; } if(m.flags.includes('q')){ this.board[m.to-2]=us*R; this.board[m.to+1]=0; } }
+    if(undo.capSq>=0) this.board[undo.capSq]=undo.captured;
+  }
+  _legalMoves(onlyFrom){
+    const pseudo=this._genPseudo(onlyFrom); const legal=[]; const us=this.turnColor();
+    for(const m of pseudo){ this._makeRaw(m); if(!this._isAttacked(this.kings[us===1?'w':'b'], -us)) legal.push(m); this._unmakeRaw(); }
+    return legal;
+  }
+  _decorate(m){ const piece=this.board[m.from]; const t=Math.abs(piece); const o={color:Math.sign(piece)===1?'w':'b', from:alg(m.from), to:alg(m.to), piece:SYM[t], flags:m.flags, _raw:m}; if(m.promotion)o.promotion=SYM[m.promotion]; let cap=0; if(m.flags.includes('e'))cap=P; else if(this.board[m.to]!==0)cap=Math.abs(this.board[m.to]); if(cap)o.captured=SYM[cap]; return o; }
+  moves(opts){ opts=opts||{}; const from = opts.square?sqFromAlg(opts.square):null; const legal=this._legalMoves(from);
+    if(opts.verbose){ return legal.map(m=>{ const d=this._decorate(m); d.san=this._san(m,legal); return d; }); }
+    return legal.map(m=>this._san(m,legal));
+  }
+  _san(m, legalList){
+    if(m.flags.includes('k'))return this._chk('O-O',m); if(m.flags.includes('q'))return this._chk('O-O-O',m);
+    const piece=Math.abs(this.board[m.from]); let s='';
+    if(piece===P){ if(m.flags.includes('c')||m.flags.includes('e')){ s=FILES[f_(m.from)]+'x'; } s+=alg(m.to); if(m.promotion)s+='='+SYM[m.promotion].toUpperCase(); }
+    else { s=SYM[piece].toUpperCase();
+      const others=(legalList||this._legalMoves(null)).filter(x=>x.to===m.to && x.from!==m.from && Math.abs(this.board[x.from])===piece);
+      if(others.length){ const sameFile=others.some(x=>f_(x.from)===f_(m.from)); const sameRank=others.some(x=>r_(x.from)===r_(m.from)); if(!sameFile)s+=FILES[f_(m.from)]; else if(!sameRank)s+=(r_(m.from)+1); else s+=alg(m.from); }
+      if(m.flags.includes('c'))s+='x'; s+=alg(m.to);
+    }
+    return this._chk(s,m);
+  }
+  _chk(s,m){ this._makeRaw(m); let suf=''; if(this.in_check()){ suf=this._legalMoves(null).length?'+':'#'; } this._unmakeRaw(); return s+suf; }
+  move(mv, opts){ opts=opts||{}; const legal=this._legalMoves(null);
+    let chosen=null;
+    if(typeof mv==='object'){ const from=mv.from, to=mv.to; const cands=legal.filter(m=>alg(m.from)===from&&alg(m.to)===to); if(mv.promotion){ chosen=cands.find(m=>SYM[m.promotion]===mv.promotion)||cands[0]; } else chosen=cands[0]; }
+    else { const clean=String(mv).replace(/[+#!?]+$/,''); const sanMap={}; for(const m of legal){ sanMap[this._san(m,legal).replace(/[+#]/g,'')]=m; }
+      chosen=sanMap[clean];
+      if(!chosen&&opts.sloppy){ const mm=clean.match(/^([a-h][1-8])([a-h][1-8])([qrbn])?$/i); if(mm){ chosen=legal.find(m=>alg(m.from)===mm[1]&&alg(m.to)===mm[2]&&(!mm[3]||SYM[m.promotion]===mm[3].toLowerCase())); } }
+    }
+    if(!chosen)return null; const dec=this._decorate(chosen); dec.san=this._san(chosen,legal); this._makeRaw(chosen); this._sans.push(dec.san); return dec;
+  }
+  undo(){ if(!this._hist.length)return null; this._unmakeRaw(); this._sans.pop(); }
+  in_checkmate(){ return this.in_check()&&this._legalMoves(null).length===0; }
+  in_stalemate(){ return !this.in_check()&&this._legalMoves(null).length===0; }
+  insufficient_material(){ let total=0; for(let sq=0;sq<128;sq++){ if(!onBoard(sq))continue; const pc=this.board[sq]; if(pc===0||Math.abs(pc)===K)continue; total++; if(Math.abs(pc)===P||Math.abs(pc)===R||Math.abs(pc)===Q)return false; } return total<=2; }
+  in_draw(){ return this.half>=100||this.in_stalemate()||this.insufficient_material(); }
+  game_over(){ return this.in_checkmate()||this.in_stalemate()||this.in_draw(); }
+  history(opts){ opts=opts||{}; if(opts.verbose){ const fenStart=this._startFen||'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      const tmp=new Chess(fenStart); const out=[]; for(const s of this._sans){ const d=tmp.move(s,{sloppy:true}); if(d)out.push(d);} return out; }
+    return this._sans.slice();
+  }
+  header(){ if(arguments.length>=2){ this.headers[arguments[0]]=arguments[1]; return; } if(arguments.length===1){ return this.headers[arguments[0]]; } return Object.assign({},this.headers); }
+  load_pgn(pgn, opts){ opts=opts||{}; this.headers={};
+    const hdrRe=/\[(\w+)\s+"([^"]*)"\]/g; let m; while((m=hdrRe.exec(pgn))){ this.headers[m[1]]=m[2]; }
+    let body=pgn.replace(/\[[^\]]*\]/g,' ');
+    body=body.replace(/\{[^}]*\}/g,' ').replace(/;[^\n]*/g,' ').replace(/\$\d+/g,' ');
+    body=body.replace(/\([^)]*\)/g,' ');
+    body=body.replace(/\d+\.(\.\.)?/g,' ').replace(/(1-0|0-1|1\/2-1\/2|\*)/g,' ');
+    const start=this.headers.FEN; if(start){ if(!this.load(start))return false; this._startFen=start; } else { this.load('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'); this._startFen=this.fen(); }
+    const tokens=body.split(/\s+/).filter(Boolean);
+    for(const tk of tokens){ const d=this.move(tk,{sloppy:true}); if(!d){ return false; } }
+    return true;
+  }
+  pgn(){ let s=''; for(const k in this.headers){ s+=`[${k} "${this.headers[k]}"]\n`; } s+='\n'; let n=1; for(let i=0;i<this._sans.length;i++){ if(i%2===0){ s+=(n)+'. '; n++; } s+=this._sans[i]+' '; } if(this.headers.Result)s+=this.headers.Result; return s.trim(); }
+}
+
+
+
+return Chess;
+})();
+</script>
+<!-- نص مكتبة المحرك للـ Web Worker (تحليل داخلي يعمل أوفلاين) -->
+<script type="text/plain" id="worker-lib">
+/* Self-contained 0x88 chess core (drop-in subset of chess.js API) */
+'use strict';
+const EMPTY=0, P=1,N=2,B=3,R=4,Q=5,K=6;
+const WK=1,WQ=2,BK=4,BQ=8;
+const KN_OFF=[-18,-33,-31,-14,18,33,31,14];
+const B_OFF=[-17,-15,17,15];
+const R_OFF=[-16,16,-1,1];
+const K_OFF=[-17,-16,-15,-1,1,15,16,17];
+const FILES=['a','b','c','d','e','f','g','h'];
+function f_(sq){return sq&7;} function r_(sq){return sq>>4;}
+function alg(sq){return FILES[f_(sq)]+(r_(sq)+1);}
+function sqFromAlg(s){return (parseInt(s[1])-1)*16 + FILES.indexOf(s[0]);}
+function onBoard(sq){return (sq&0x88)===0;}
+const SYM={1:'p',2:'n',3:'b',4:'r',5:'q',6:'k'};
+const FROMSYM={p:1,n:2,b:3,r:4,q:5,k:6};
+
+class Chess{
+  constructor(fen){ this.headers={}; this.reset(); if(fen){ this.load(fen);} else { this.load('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'); } }
+  reset(){ this.board=new Int8Array(128); this._turn='w'; this.castling=0; this.ep=-1; this.half=0; this.moveno=1; this.kings={w:-1,b:-1}; this._hist=[]; this._sans=[]; }
+  validate_fen(fen){
+    const parts=fen.trim().split(/\s+/); if(parts.length<4) return {valid:false,error:'حقول ناقصة'};
+    const rows=parts[0].split('/'); if(rows.length!==8) return {valid:false,error:'عدد الصفوف غير صحيح'};
+    for(const row of rows){ let c=0; for(const ch of row){ if(/\d/.test(ch))c+=+ch; else if(/[prnbqkPRNBQK]/.test(ch))c++; else return {valid:false,error:'حرف غير صالح'}; } if(c!==8) return {valid:false,error:'صف بطول خاطئ'}; }
+    if(!/^[wb]$/.test(parts[1])) return {valid:false,error:'دور غير صحيح'};
+    return {valid:true,error:null};
+  }
+  load(fen){
+    const v=this.validate_fen(fen); if(!v.valid) return false;
+    this.reset();
+    const parts=fen.trim().split(/\s+/); const rows=parts[0].split('/');
+    for(let r=0;r<8;r++){ let file=0; for(const ch of rows[r]){ if(/\d/.test(ch)){file+=+ch;} else { const color=ch===ch.toUpperCase()?1:-1; const t=FROMSYM[ch.toLowerCase()]; const sq=(7-r)*16+file; this.board[sq]=color*t; if(t===K){ this.kings[color===1?'w':'b']=sq; } file++; } } }
+    this._turn=parts[1];
+    if(parts[2]&&parts[2]!=='-'){ if(parts[2].includes('K'))this.castling|=WK; if(parts[2].includes('Q'))this.castling|=WQ; if(parts[2].includes('k'))this.castling|=BK; if(parts[2].includes('q'))this.castling|=BQ; }
+    this.ep = (parts[3]&&parts[3]!=='-')?sqFromAlg(parts[3]):-1;
+    this.half = parts[4]?parseInt(parts[4]):0; this.moveno=parts[5]?parseInt(parts[5]):1;
+    return true;
+  }
+  fen(){
+    let s=''; for(let r=7;r>=0;r--){ let empty=0; for(let f=0;f<8;f++){ const pc=this.board[r*16+f]; if(pc===0){empty++;} else { if(empty){s+=empty;empty=0;} let l=SYM[Math.abs(pc)]; s+= pc>0?l.toUpperCase():l; } } if(empty)s+=empty; if(r)s+='/'; }
+    let cr=''; if(this.castling&WK)cr+='K'; if(this.castling&WQ)cr+='Q'; if(this.castling&BK)cr+='k'; if(this.castling&BQ)cr+='q'; if(!cr)cr='-';
+    return s+' '+this._turn+' '+cr+' '+(this.ep>=0?alg(this.ep):'-')+' '+this.half+' '+this.moveno;
+  }
+  turnColor(){ return this._turn==='w'?1:-1; }
+  turn(){ return this._turn; }
+  _isAttacked(sq, bySign){
+    if(bySign===1){ if(onBoard(sq-17)&&this.board[sq-17]===P) return true; if(onBoard(sq-15)&&this.board[sq-15]===P) return true; }
+    else { if(onBoard(sq+17)&&this.board[sq+17]===-P) return true; if(onBoard(sq+15)&&this.board[sq+15]===-P) return true; }
+    for(const o of KN_OFF){ const t=sq+o; if(onBoard(t)&&this.board[t]===bySign*N) return true; }
+    for(const o of K_OFF){ const t=sq+o; if(onBoard(t)&&this.board[t]===bySign*K) return true; }
+    for(const o of B_OFF){ let t=sq+o; while(onBoard(t)){ const pc=this.board[t]; if(pc!==0){ if(pc===bySign*B||pc===bySign*Q) return true; break; } t+=o; } }
+    for(const o of R_OFF){ let t=sq+o; while(onBoard(t)){ const pc=this.board[t]; if(pc!==0){ if(pc===bySign*R||pc===bySign*Q) return true; break; } t+=o; } }
+    return false;
+  }
+  in_check(){ const us=this.turnColor(); const ks=this.kings[this._turn]; return this._isAttacked(ks, -us); }
+  _genPseudo(onlyFrom){
+    const us=this.turnColor(); const moves=[];
+    const add=(from,to,flags,promo)=>{ moves.push({from,to,flags,promotion:promo}); };
+    for(let sq=0;sq<128;sq++){ if(!onBoard(sq))continue; const pc=this.board[sq]; if(pc===0||Math.sign(pc)!==us)continue; if(onlyFrom!=null&&sq!==onlyFrom)continue; const t=Math.abs(pc);
+      if(t===P){ const dir=us===1?16:-16; const startRank=us===1?1:6; const promoRank=us===1?6:1;
+        const one=sq+dir; if(onBoard(one)&&this.board[one]===0){ if(r_(sq)===promoRank){ for(const pr of [Q,R,B,N]) add(sq,one,'np',pr);} else { add(sq,one,'n'); if(r_(sq)===startRank){ const two=sq+2*dir; if(this.board[two]===0) add(sq,two,'b'); } } }
+        for(const dc of [dir-1,dir+1]){ const tt=sq+dc; if(!onBoard(tt))continue; const cap=this.board[tt]; if(cap!==0&&Math.sign(cap)===-us){ if(r_(sq)===promoRank){ for(const pr of [Q,R,B,N]) add(sq,tt,'cp',pr);} else add(sq,tt,'c'); } else if(tt===this.ep){ add(sq,tt,'e'); } }
+      } else if(t===N){ for(const o of KN_OFF){ const tt=sq+o; if(!onBoard(tt))continue; const cap=this.board[tt]; if(cap===0)add(sq,tt,'n'); else if(Math.sign(cap)===-us)add(sq,tt,'c'); } }
+      else if(t===K){ for(const o of K_OFF){ const tt=sq+o; if(!onBoard(tt))continue; const cap=this.board[tt]; if(cap===0)add(sq,tt,'n'); else if(Math.sign(cap)===-us)add(sq,tt,'c'); }
+        if(us===1&&sq===4){ if((this.castling&WK)&&this.board[5]===0&&this.board[6]===0&&this.board[7]===R&&!this._isAttacked(4,-1)&&!this._isAttacked(5,-1)&&!this._isAttacked(6,-1)) add(4,6,'k'); if((this.castling&WQ)&&this.board[3]===0&&this.board[2]===0&&this.board[1]===0&&this.board[0]===R&&!this._isAttacked(4,-1)&&!this._isAttacked(3,-1)&&!this._isAttacked(2,-1)) add(4,2,'q'); }
+        if(us===-1&&sq===116){ if((this.castling&BK)&&this.board[117]===0&&this.board[118]===0&&this.board[119]===-R&&!this._isAttacked(116,1)&&!this._isAttacked(117,1)&&!this._isAttacked(118,1)) add(116,118,'k'); if((this.castling&BQ)&&this.board[115]===0&&this.board[114]===0&&this.board[113]===0&&this.board[112]===-R&&!this._isAttacked(116,1)&&!this._isAttacked(115,1)&&!this._isAttacked(114,1)) add(116,114,'q'); }
+      } else { const offs = t===B?B_OFF:t===R?R_OFF:K_OFF; for(const o of offs){ let tt=sq+o; while(onBoard(tt)){ const cap=this.board[tt]; if(cap===0)add(sq,tt,'n'); else { if(Math.sign(cap)===-us)add(sq,tt,'c'); break; } tt+=o; } } }
+    }
+    return moves;
+  }
+  _makeRaw(m){
+    const us=this.turnColor(); const piece=this.board[m.from]; const undo={m, captured:0, capSq:-1, castling:this.castling, ep:this.ep, half:this.half, moveno:this.moveno, king:this.kings[this._turn]};
+    this.ep=-1;
+    if(m.flags.includes('e')){ const capSq=m.to-(us===1?16:-16); undo.captured=this.board[capSq]; undo.capSq=capSq; this.board[capSq]=0; }
+    else if(this.board[m.to]!==0){ undo.captured=this.board[m.to]; undo.capSq=m.to; }
+    this.board[m.to]=piece; this.board[m.from]=0;
+    if(m.promotion){ this.board[m.to]=us*m.promotion; }
+    if(Math.abs(piece)===K){ this.kings[this._turn]=m.to; if(m.flags.includes('k')){ this.board[m.to-1]=us*R; this.board[m.to+1]=0; } if(m.flags.includes('q')){ this.board[m.to+1]=us*R; this.board[m.to-2]=0; } }
+    if(m.flags.includes('b')) this.ep=m.from+(us===1?16:-16);
+    if(piece===K){ this.castling&=~(WK|WQ);} if(piece===-K){ this.castling&=~(BK|BQ);}
+    if(m.from===0||m.to===0)this.castling&=~WQ; if(m.from===7||m.to===7)this.castling&=~WK; if(m.from===112||m.to===112)this.castling&=~BQ; if(m.from===119||m.to===119)this.castling&=~BK;
+    this.half = (Math.abs(piece)===P||undo.captured!==0)?0:this.half+1;
+    if(this._turn==='b')this.moveno++;
+    this._turn = this._turn==='w'?'b':'w';
+    this._hist.push(undo); return undo;
+  }
+  _unmakeRaw(){
+    const undo=this._hist.pop(); if(!undo)return; const m=undo.m;
+    this._turn=this._turn==='w'?'b':'w'; const us=this.turnColor();
+    this.castling=undo.castling; this.ep=undo.ep; this.half=undo.half; this.moveno=undo.moveno; this.kings[this._turn]=undo.king;
+    let piece=this.board[m.to];
+    if(m.promotion){ piece=us*P; }
+    this.board[m.from]=piece; this.board[m.to]=0;
+    if(Math.abs(piece)===K){ this.kings[this._turn]=m.from; if(m.flags.includes('k')){ this.board[m.to+1]=us*R; this.board[m.to-1]=0; } if(m.flags.includes('q')){ this.board[m.to-2]=us*R; this.board[m.to+1]=0; } }
+    if(undo.capSq>=0) this.board[undo.capSq]=undo.captured;
+  }
+  _legalMoves(onlyFrom){
+    const pseudo=this._genPseudo(onlyFrom); const legal=[]; const us=this.turnColor();
+    for(const m of pseudo){ this._makeRaw(m); if(!this._isAttacked(this.kings[us===1?'w':'b'], -us)) legal.push(m); this._unmakeRaw(); }
+    return legal;
+  }
+  _decorate(m){ const piece=this.board[m.from]; const t=Math.abs(piece); const o={color:Math.sign(piece)===1?'w':'b', from:alg(m.from), to:alg(m.to), piece:SYM[t], flags:m.flags, _raw:m}; if(m.promotion)o.promotion=SYM[m.promotion]; let cap=0; if(m.flags.includes('e'))cap=P; else if(this.board[m.to]!==0)cap=Math.abs(this.board[m.to]); if(cap)o.captured=SYM[cap]; return o; }
+  moves(opts){ opts=opts||{}; const from = opts.square?sqFromAlg(opts.square):null; const legal=this._legalMoves(from);
+    if(opts.verbose){ return legal.map(m=>{ const d=this._decorate(m); d.san=this._san(m,legal); return d; }); }
+    return legal.map(m=>this._san(m,legal));
+  }
+  _san(m, legalList){
+    if(m.flags.includes('k'))return this._chk('O-O',m); if(m.flags.includes('q'))return this._chk('O-O-O',m);
+    const piece=Math.abs(this.board[m.from]); let s='';
+    if(piece===P){ if(m.flags.includes('c')||m.flags.includes('e')){ s=FILES[f_(m.from)]+'x'; } s+=alg(m.to); if(m.promotion)s+='='+SYM[m.promotion].toUpperCase(); }
+    else { s=SYM[piece].toUpperCase();
+      const others=(legalList||this._legalMoves(null)).filter(x=>x.to===m.to && x.from!==m.from && Math.abs(this.board[x.from])===piece);
+      if(others.length){ const sameFile=others.some(x=>f_(x.from)===f_(m.from)); const sameRank=others.some(x=>r_(x.from)===r_(m.from)); if(!sameFile)s+=FILES[f_(m.from)]; else if(!sameRank)s+=(r_(m.from)+1); else s+=alg(m.from); }
+      if(m.flags.includes('c'))s+='x'; s+=alg(m.to);
+    }
+    return this._chk(s,m);
+  }
+  _chk(s,m){ this._makeRaw(m); let suf=''; if(this.in_check()){ suf=this._legalMoves(null).length?'+':'#'; } this._unmakeRaw(); return s+suf; }
+  move(mv, opts){ opts=opts||{}; const legal=this._legalMoves(null);
+    let chosen=null;
+    if(typeof mv==='object'){ const from=mv.from, to=mv.to; const cands=legal.filter(m=>alg(m.from)===from&&alg(m.to)===to); if(mv.promotion){ chosen=cands.find(m=>SYM[m.promotion]===mv.promotion)||cands[0]; } else chosen=cands[0]; }
+    else { const clean=String(mv).replace(/[+#!?]+$/,''); const sanMap={}; for(const m of legal){ sanMap[this._san(m,legal).replace(/[+#]/g,'')]=m; }
+      chosen=sanMap[clean];
+      if(!chosen&&opts.sloppy){ const mm=clean.match(/^([a-h][1-8])([a-h][1-8])([qrbn])?$/i); if(mm){ chosen=legal.find(m=>alg(m.from)===mm[1]&&alg(m.to)===mm[2]&&(!mm[3]||SYM[m.promotion]===mm[3].toLowerCase())); } }
+    }
+    if(!chosen)return null; const dec=this._decorate(chosen); dec.san=this._san(chosen,legal); this._makeRaw(chosen); this._sans.push(dec.san); return dec;
+  }
+  undo(){ if(!this._hist.length)return null; this._unmakeRaw(); this._sans.pop(); }
+  in_checkmate(){ return this.in_check()&&this._legalMoves(null).length===0; }
+  in_stalemate(){ return !this.in_check()&&this._legalMoves(null).length===0; }
+  insufficient_material(){ let total=0; for(let sq=0;sq<128;sq++){ if(!onBoard(sq))continue; const pc=this.board[sq]; if(pc===0||Math.abs(pc)===K)continue; total++; if(Math.abs(pc)===P||Math.abs(pc)===R||Math.abs(pc)===Q)return false; } return total<=2; }
+  in_draw(){ return this.half>=100||this.in_stalemate()||this.insufficient_material(); }
+  game_over(){ return this.in_checkmate()||this.in_stalemate()||this.in_draw(); }
+  history(opts){ opts=opts||{}; if(opts.verbose){ const fenStart=this._startFen||'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      const tmp=new Chess(fenStart); const out=[]; for(const s of this._sans){ const d=tmp.move(s,{sloppy:true}); if(d)out.push(d);} return out; }
+    return this._sans.slice();
+  }
+  header(){ if(arguments.length>=2){ this.headers[arguments[0]]=arguments[1]; return; } if(arguments.length===1){ return this.headers[arguments[0]]; } return Object.assign({},this.headers); }
+  load_pgn(pgn, opts){ opts=opts||{}; this.headers={};
+    const hdrRe=/\[(\w+)\s+"([^"]*)"\]/g; let m; while((m=hdrRe.exec(pgn))){ this.headers[m[1]]=m[2]; }
+    let body=pgn.replace(/\[[^\]]*\]/g,' ');
+    body=body.replace(/\{[^}]*\}/g,' ').replace(/;[^\n]*/g,' ').replace(/\$\d+/g,' ');
+    body=body.replace(/\([^)]*\)/g,' ');
+    body=body.replace(/\d+\.(\.\.)?/g,' ').replace(/(1-0|0-1|1\/2-1\/2|\*)/g,' ');
+    const start=this.headers.FEN; if(start){ if(!this.load(start))return false; this._startFen=start; } else { this.load('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'); this._startFen=this.fen(); }
+    const tokens=body.split(/\s+/).filter(Boolean);
+    for(const tk of tokens){ const d=this.move(tk,{sloppy:true}); if(!d){ return false; } }
+    return true;
+  }
+  pgn(){ let s=''; for(const k in this.headers){ s+=`[${k} "${this.headers[k]}"]\n`; } s+='\n'; let n=1; for(let i=0;i<this._sans.length;i++){ if(i%2===0){ s+=(n)+'. '; n++; } s+=this._sans[i]+' '; } if(this.headers.Result)s+=this.headers.Result; return s.trim(); }
+}
+
+
+
+/* ===== محرك بحث داخلي (Negamax + Alpha-Beta + Quiescence) ===== */
+const PVAL={1:100,2:320,3:330,4:500,5:900,6:0};
+const PST={
+ 1:[0,0,0,0,0,0,0,0, 50,50,50,50,50,50,50,50, 10,10,20,30,30,20,10,10, 5,5,10,25,25,10,5,5, 0,0,0,20,20,0,0,0, 5,-5,-10,0,0,-10,-5,5, 5,10,10,-20,-20,10,10,5, 0,0,0,0,0,0,0,0],
+ 2:[-50,-40,-30,-30,-30,-30,-40,-50, -40,-20,0,0,0,0,-20,-40, -30,0,10,15,15,10,0,-30, -30,5,15,20,20,15,5,-30, -30,0,15,20,20,15,0,-30, -30,5,10,15,15,10,5,-30, -40,-20,0,5,5,0,-20,-40, -50,-40,-30,-30,-30,-30,-40,-50],
+ 3:[-20,-10,-10,-10,-10,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,10,10,5,0,-10, -10,5,5,10,10,5,5,-10, -10,0,10,10,10,10,0,-10, -10,10,10,10,10,10,10,-10, -10,5,0,0,0,0,5,-10, -20,-10,-10,-10,-10,-10,-10,-20],
+ 4:[0,0,0,0,0,0,0,0, 5,10,10,10,10,10,10,5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, 0,0,0,5,5,0,0,0],
+ 5:[-20,-10,-10,-5,-5,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,5,5,5,0,-10, -5,0,5,5,5,5,0,-5, 0,0,5,5,5,5,0,-5, -10,5,5,5,5,5,0,-10, -10,0,5,0,0,0,0,-10, -20,-10,-10,-5,-5,-10,-10,-20],
+ 6:[-30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -20,-30,-30,-40,-40,-30,-30,-20, -10,-20,-20,-20,-20,-20,-20,-10, 20,20,0,0,0,0,20,20, 20,30,10,0,0,10,30,20],
+};
+const MATE=100000, INF=1000000;
+function evaluate(ch){
+  let sc=0;
+  for(let sq=0;sq<128;sq++){ if(!onBoard(sq))continue; const pc=ch.board[sq]; if(pc===0)continue; const t=Math.abs(pc); const rk=r_(sq),fl=f_(sq);
+    if(pc>0){ sc += PVAL[t] + PST[t][(7-rk)*8+fl]; } else { sc -= PVAL[t] + PST[t][rk*8+fl]; } }
+  return sc;
+}
+function evalNega(ch){ const s=evaluate(ch); return ch.turn()==='w'?s:-s; }
+function mvvlva(ch,m){ if(m.flags.includes('c')){ const victim=Math.abs(ch.board[m.to])||1; const att=Math.abs(ch.board[m.from]); return 1000+victim*10-att; } if(m.flags.includes('e'))return 1005; if(m.promotion)return 900; return 0; }
+function order(ch,moves){ return moves.map(m=>[mvvlva(ch,m),m]).sort((a,b)=>b[0]-a[0]).map(x=>x[1]); }
+function quiesce(ch,alpha,beta,qd){
+  let stand=evalNega(ch); if(stand>=beta)return beta; if(stand>alpha)alpha=stand; if(qd<=0)return alpha;
+  const caps=order(ch, ch._legalMoves(null).filter(m=>m.flags.includes('c')||m.flags.includes('e')||m.promotion));
+  for(const m of caps){ ch._makeRaw(m); const sc=-quiesce(ch,-beta,-alpha,qd-1); ch._unmakeRaw(); if(sc>=beta)return beta; if(sc>alpha)alpha=sc; }
+  return alpha;
+}
+function negamax(ch,depth,alpha,beta,ply){
+  if(depth<=0) return quiesce(ch,alpha,beta,10);
+  const moves=order(ch, ch._legalMoves(null));
+  if(moves.length===0){ return ch.in_check()? -(MATE-ply) : 0; }
+  let best=-INF;
+  for(const m of moves){ ch._makeRaw(m); const sc=-negamax(ch,depth-1,-beta,-alpha,ply+1); ch._unmakeRaw(); if(sc>best)best=sc; if(best>alpha)alpha=best; if(alpha>=beta)break; }
+  return best;
+}
+function engUci(m){ return alg(m.from)+alg(m.to)+(m.promotion?SYM[m.promotion]:''); }
+
+
+/* ===== جسر العامل (Web Worker) ===== */
+onmessage=function(e){
+  const d=e.data; const id=d.id; const ch=new Chess(d.fen);
+  const moves=order(ch, ch._legalMoves(null)); const total=moves.length||1; const res=[];
+  for(let i=0;i<moves.length;i++){ const m=moves[i]; ch._makeRaw(m); const sc=-negamax(ch,d.depth-1,-INF,INF,1); ch._unmakeRaw(); res.push({m,score:sc}); postMessage({type:'progress',id,frac:(i+1)/total}); }
+  res.sort((a,b)=>b.score-a.score);
+  const lines=res.map(x=>({move:engUci(x.m), cp:x.score, pv:[engUci(x.m)]}));
+  postMessage({type:'result',id, lines, bestmove: lines.length?lines[0].move:null});
+};
+
+</script>
 
 <script>
 "use strict";
@@ -450,13 +816,8 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:14px 0;}
    ===================================================================== */
 const $ = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
-const PIECE_IMG = p => `https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/cburnett/${p}.svg`;
-/* مصدر بديل موثوق لصور القطع (chessboard.js wikipedia set) */
-const PIECE_IMG_FALLBACK = p => `https://chessboardjs.com/img/chesspieces/wikipedia/${p}.png`;
-function pieceUrl(color,type){ // color 'w'|'b', type 'p'..'k'
-  const code = color.toUpperCase()==='W' ? 'w'+type.toUpperCase() : 'b'+type.toUpperCase();
-  return PIECE_IMG_FALLBACK(code); // نستخدم النسخة الأكثر استقراراً افتراضياً
-}
+/* قطع الشطرنج كرموز يونيكود (تعمل أوفلاين بالكامل، بلا صور خارجية) */
+const GLYPH = {k:'\u265A',q:'\u265B',r:'\u265C',b:'\u265D',n:'\u265E',p:'\u265F'};
 
 const FILES = ['a','b','c','d','e','f','g','h'];
 const PIECE_VALUE = {p:100,n:300,b:330,r:500,q:900,k:20000};
@@ -464,11 +825,11 @@ const PIECE_VALUE = {p:100,n:300,b:330,r:500,q:900,k:20000};
 /* ---------- الترجمة (عربي/إنجليزي) ---------- */
 const I18N = {
   ar:{
-    appTitle:"محلل الشطرنج",appSub:"تحليل احترافي بمحرك Stockfish",
+    appTitle:"محلل الشطرنج",appSub:"محرك داخلي يعمل بدون إنترنت",
     t1_title:"تحليل مباراة",t1_hint:"الصق رابط مباراة من Lichess (يُجلب تلقائياً) أو رابط Chess.com، أو الصق نص الـ PGN مباشرة. ثم اضغط تحليل.",
     t1_url:"رابط المباراة (Lichess / Chess.com)",t1_fetch:"جلب الـPGN",t1_depth:"عمق التحليل للمحرك:",t1_analyze:"تحليل المباراة",stop:"إيقاف",
     summary:"ملخص التحليل",white:"الأبيض",black:"الأسود",accuracy:"الدقة",
-    approxNote:"⚠️ التصنيفات (خصوصاً Brilliant وGreat) تقريبية ومبنية على منطق حسابي فوق تقييمات Stockfish، وقد تختلف عن نظام chess.com الرسمي غير المعلن.",
+    approxNote:"⚠️ التصنيفات (خصوصاً Brilliant وGreat) تقريبية ومبنية على منطق حسابي فوق تقييمات المحرك الداخلي، وقد تختلف عن نظام chess.com الرسمي غير المعلن.",
     t2_title:"الباحث عن النقلة العبقرية",t2_hint:"رتّب القطع بحرية (اسحب وأفلِت)، اختر دور اللعب، ثم اضغط «بحث» ليُظهر فقط Brilliant (‼) أو Great (!).",
     whiteToMove:"دور الأبيض",blackToMove:"دور الأسود",startPos:"الوضع الابتدائي",clearBoard:"تفريغ الرقعة",
     t2_depth:"عمق البحث:",t2_find:"ابحث عن النقلات الرائعة",
@@ -478,18 +839,18 @@ const I18N = {
     t5_title:"تخصيص المظهر",t5_hint:"غيّر ألوان الموقع ولون الرقعة. تُحفظ تلقائياً.",
     c_primary:"الأساسي",c_primary2:"الأساسي الفاتح",c_accent:"التمييز",c_bg:"الخلفية",c_surface:"البطاقات",c_blight:"الرقعة فاتح",c_bdark:"الرقعة غامق",
     language:"اللغة",resetTheme:"إعادة الضبط الافتراضي",about:"حول",
-    aboutText:"ملف HTML واحد يعمل بالكامل في المتصفح. يستخدم Stockfish للتحليل وواجهات Lichess وChess.com لجلب المباريات. لا يوجد خادم خلفي.",
-    engineNote:"يتم تحميل محرك Stockfish من شبكة CDN عند أول استخدام. تأكد من اتصالك بالإنترنت أول مرة.",
+    aboutText:"ملف HTML واحد يعمل بالكامل في المتصفح مع محرك شطرنج داخلي مدمج (بدون أي مكتبة خارجية)، لذا يعمل التحليل حتى بدون إنترنت. واجهات Lichess/Chess.com تُستخدم فقط لجلب المباريات واللغز عند توفر الإنترنت.",
+    engineNote:"المحرك ونواة الشطرنج مدمجان داخل الملف ويعملان أوفلاين. الإنترنت مطلوب فقط لجلب مباريات Lichess/Chess.com ولغز اليوم.",
     tab1:"تحليل",tab2:"العبقرية",tab3:"لغز",tab4:"السجل",tab5:"إعدادات",
     Brilliant:"عبقرية",Great:"رائعة",Best:"الأفضل",Excellent:"ممتازة",Good:"جيدة",Book:"افتتاحية",Inaccuracy:"عدم دقة",Mistake:"خطأ",Blunder:"خطأ فادح",
     moves:"نقلات",blunders:"أخطاء فادحة",
   },
   en:{
-    appTitle:"Chess Analyzer",appSub:"Pro analysis with Stockfish",
+    appTitle:"Chess Analyzer",appSub:"Built-in engine, works offline",
     t1_title:"Analyze a Game",t1_hint:"Paste a Lichess game URL (auto-fetched) or a Chess.com URL, or paste PGN directly. Then press Analyze.",
     t1_url:"Game URL (Lichess / Chess.com)",t1_fetch:"Fetch PGN",t1_depth:"Engine depth:",t1_analyze:"Analyze Game",stop:"Stop",
     summary:"Analysis Summary",white:"White",black:"Black",accuracy:"Accuracy",
-    approxNote:"⚠️ Classifications (especially Brilliant & Great) are approximate heuristics over Stockfish evaluations and may differ from Chess.com's undisclosed system.",
+    approxNote:"⚠️ Classifications (especially Brilliant & Great) are approximate heuristics over the built-in engine's evaluations and may differ from Chess.com's undisclosed system.",
     t2_title:"Brilliant Move Finder",t2_hint:"Arrange pieces freely (drag & drop), pick side to move, then press Find to show only Brilliant (‼) or Great (!) moves.",
     whiteToMove:"White to move",blackToMove:"Black to move",startPos:"Start position",clearBoard:"Clear board",
     t2_depth:"Search depth:",t2_find:"Find brilliant moves",
@@ -499,8 +860,8 @@ const I18N = {
     t5_title:"Customize Appearance",t5_hint:"Change site colors and board colors. Saved automatically.",
     c_primary:"Primary",c_primary2:"Primary light",c_accent:"Accent",c_bg:"Background",c_surface:"Cards",c_blight:"Board light",c_bdark:"Board dark",
     language:"Language",resetTheme:"Reset to default",about:"About",
-    aboutText:"A single HTML file running fully in the browser. Uses Stockfish for analysis and the public Lichess & Chess.com APIs to fetch games. No backend.",
-    engineNote:"Stockfish is loaded from a CDN on first use. Make sure you are online the first time.",
+    aboutText:"A single HTML file running fully in the browser with a built-in chess engine (no external libraries), so analysis works even offline. The Lichess/Chess.com APIs are only used to fetch games and the daily puzzle when online.",
+    engineNote:"The engine and chess core are embedded in the file and run offline. Internet is only needed to fetch Lichess/Chess.com games and the daily puzzle.",
     tab1:"Analyze",tab2:"Brilliant",tab3:"Puzzle",tab4:"History",tab5:"Settings",
     Brilliant:"Brilliant",Great:"Great",Best:"Best",Excellent:"Excellent",Good:"Good",Book:"Book",Inaccuracy:"Inaccuracy",Mistake:"Mistake",Blunder:"Blunder",
     moves:"moves",blunders:"blunders",
@@ -587,7 +948,10 @@ class Board{
     }
     this.layerHL = []; // عناصر الإبراز
     this._positionSquares();
+    this._updateFont();
+    if(window.ResizeObserver){ this._ro=new ResizeObserver(()=>this._updateFont()); this._ro.observe(this.el); }
   }
+  _updateFont(){ const w=this.el.clientWidth; if(w>0) this.el.style.fontSize=(w/8)+'px'; }
   applyColors(){ /* الألوان تأتي من متغيرات CSS تلقائياً، لا حاجة لإعادة بناء */ }
   setOrientation(o){ this.orientation=o; this._positionSquares(); this._repositionAll(); }
   flip(){ this.setOrientation(this.orientation==='w'?'b':'w'); }
@@ -610,8 +974,8 @@ class Board{
   _xyOf(sq){ const {col,row}=this._screen(sq); return {left:col*12.5, top:row*12.5}; }
 
   _makePiece(color,type){
-    const p=document.createElement('div'); p.className='piece';
-    p.style.backgroundImage=`url("${pieceUrl(color,type)}")`;
+    const p=document.createElement('div'); p.className='piece '+color;
+    p.textContent=GLYPH[type];
     p.dataset.color=color; p.dataset.type=type;
     return p;
   }
@@ -656,7 +1020,7 @@ class Board{
       const {left,top}=this._xyOf(m.to); fromNode.style.left=left+'%'; fromNode.style.top=top+'%';
       delete this.nodes[m.from]; this.nodes[m.to]=fromNode;
       // ترقية
-      if(m.promotion){ fromNode.style.backgroundImage=`url("${pieceUrl(m.color,m.promotion)}")`; fromNode.dataset.type=m.promotion; }
+      if(m.promotion){ fromNode.textContent=GLYPH[m.promotion]; fromNode.dataset.type=m.promotion; }
     }
     // التبييت: تحريك الطابية
     if(m.flags && (m.flags.includes('k')||m.flags.includes('q'))){
@@ -752,91 +1116,35 @@ let board1=null, board2=null, board3=null;
 
 <script>
 /* =====================================================================
-   3) غلاف محرك Stockfish (WASM/JS) عبر UCI مع دعم MultiPV
-   - يُحمّل المحرك من عدة مصادر CDN احتياطية داخل Web Worker.
-   - واجهة وعود (Promise) مع طابور لمنع تداخل عمليات التحليل.
+   3) المحرك الداخلي المدمج (Web Worker) — يعمل بالكامل أوفلاين
+   - مصدر المحرك + نواة الشطرنج مدمجان في وسم <script id="worker-lib">.
+   - واجهة وعود (Promise) مع طابور وتقدّم لحظي (onProgress من 0 إلى 1).
    ===================================================================== */
-const SF_SOURCES = [
-  {js:'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js', dir:'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/'},
-  {js:'https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js', dir:'https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/'},
-  {js:'https://unpkg.com/stockfish.js@10.0.2/stockfish.js', dir:'https://unpkg.com/stockfish.js@10.0.2/'}
-];
-function scoreToCp(o){ // تحويل تقييم (نسبةً لمن عليه الدور) إلى سنتيبون موحّد
+function scoreToCp(o){ // التقييم بالسنتيبون (نسبةً لمن عليه الدور)؛ المات يُمثَّل برقم كبير
   if(o.mate!=null){ return (o.mate>0?1:-1)*(1000000 - Math.abs(o.mate)*1000); }
   return o.cp;
 }
 class Engine{
-  constructor(){ this.worker=null; this.ready=false; this._handler=null; this._queue=Promise.resolve(); this._initPromise=null; }
-  async init(onStatus){
-    if(this.ready) return;
-    if(this._initPromise) return this._initPromise;
-    this._initPromise = (async()=>{
-      let lastErr=null;
-      for(const src of SF_SOURCES){
-        try{ if(onStatus)onStatus('تحميل المحرك… ('+src.dir.split('/')[2]+')'); await this._tryStart(src); this.ready=true; if(onStatus)onStatus(''); return; }
-        catch(err){ lastErr=err; try{this.worker&&this.worker.terminate();}catch(e){} this.worker=null; }
-      }
-      throw new Error('تعذّر تحميل محرك Stockfish من جميع المصادر. تحقق من اتصالك بالإنترنت. ('+(lastErr&&lastErr.message)+')');
-    })();
-    return this._initPromise;
+  constructor(){ this.worker=null; this._cbs={}; this._id=0; this._queue=Promise.resolve(); }
+  _ensure(){
+    if(this.worker) return;
+    const src=document.getElementById('worker-lib').textContent;
+    const blob=new Blob([src],{type:'application/javascript'});
+    this.worker=new Worker(URL.createObjectURL(blob));
+    this.worker.onmessage=(e)=>{
+      const d=e.data; const cb=this._cbs[d.id]; if(!cb) return;
+      if(d.type==='progress'){ if(cb.onProgress) cb.onProgress(d.frac); }
+      else if(d.type==='result'){ cb.resolve(d); delete this._cbs[d.id]; }
+    };
+    this.worker.onerror=(e)=>{ console.error('Engine worker error',e.message); };
   }
-  _tryStart(src){
-    return new Promise((resolve,reject)=>{
-      // كود الـ Worker: نضبط locateFile لتحميل ملف wasm من نفس مجلد CDN.
-      // لا نتدخّل في print/printErr حتى لا نكسر بروتوكول UCI الخاص بنسخة nmrugg.
-      const code = `
-        var Module={locateFile:function(p){return ${JSON.stringify(src.dir)}+p;}};
-        self.Module=Module;
-        try{ importScripts(${JSON.stringify(src.js)}); }
-        catch(e){ postMessage('SF_LOAD_ERROR:'+e.message); }
-      `;
-      const blob=new Blob([code],{type:'application/javascript'});
-      const url=URL.createObjectURL(blob);
-      let w; try{ w=new Worker(url); }catch(e){ reject(e); return; }
-      let done=false;
-      const timeout=setTimeout(()=>{ if(!done){done=true; reject(new Error('انتهت مهلة بدء المحرك'));} }, 20000);
-      w.onmessage=(ev)=>{
-        const line = typeof ev.data==='string'?ev.data:(ev.data&&ev.data.data)||'';
-        if(line.startsWith('SF_LOAD_ERROR')){ if(!done){done=true;clearTimeout(timeout);reject(new Error(line));} return; }
-        if(line.indexOf('uciok')>=0){ w.postMessage('isready'); }
-        else if(line.indexOf('readyok')>=0){ if(!done){ done=true; clearTimeout(timeout); this.worker=w; this._attach(); resolve(); } }
-        // أول رسالة → ابدأ مصافحة UCI
-        if(!this._kicked){ this._kicked=true; }
-      };
-      w.onerror=(e)=>{ if(!done){done=true;clearTimeout(timeout);reject(new Error('خطأ Worker: '+(e.message||'')));} };
-      // ابدأ مصافحة UCI
-      setTimeout(()=>{ try{ w.postMessage('uci'); }catch(e){} }, 50);
-    });
-  }
-  _attach(){
-    this.worker.onmessage=(ev)=>{ const line=typeof ev.data==='string'?ev.data:(ev.data&&ev.data.data)||''; if(this._handler) this._handler(line); };
-  }
-  send(cmd){ this.worker.postMessage(cmd); }
-  stop(){ if(this.worker) try{this.worker.postMessage('stop');}catch(e){} }
+  async init(onStatus){ try{ this._ensure(); if(onStatus)onStatus(''); }catch(err){ throw new Error('تعذّر بدء المحرك الداخلي: '+(err&&err.message)); } }
+  stop(){ /* الإيقاف يتم عبر stopFlag بين الوضعيات؛ لا نُنهي العامل */ }
 
-  /* تحليل وضعية: يرجع {bestmove, lines:[{multipv,cp,mate,depth,pv[],move}]} */
-  analyze(fen,{depth=12,multipv=1}={}){
-    const run=()=>new Promise((resolve)=>{
-      const lines={}; 
-      this._handler=(line)=>{
-        if(line.indexOf('info')===0 && line.indexOf(' pv ')>=0 && line.indexOf('score')>=0){
-          const mpM=line.match(/multipv (\d+)/); const mp=mpM?+mpM[1]:1;
-          const cpM=line.match(/score cp (-?\d+)/); const mateM=line.match(/score mate (-?\d+)/);
-          const dM=line.match(/ depth (\d+)/);
-          const pv=line.split(' pv ')[1].trim().split(/\s+/);
-          lines[mp]={multipv:mp, cp:cpM?+cpM[1]:null, mate:mateM?+mateM[1]:null, depth:dM?+dM[1]:0, pv, move:pv[0]};
-        } else if(line.indexOf('bestmove')===0){
-          const bm=line.split(/\s+/)[1];
-          this._handler=null;
-          resolve({bestmove:bm, lines:Object.values(lines).sort((a,b)=>a.multipv-b.multipv)});
-        }
-      };
-      this.send('setoption name MultiPV value '+multipv);
-      this.send('position fen '+fen);
-      this.send('go depth '+depth);
-    });
-    // تسلسل الطلبات
-    this._queue = this._queue.then(run, run);
+  /* تحليل وضعية: يرجع {bestmove, lines:[{move(uci),cp,pv[]}]} مرتبة من الأفضل */
+  analyze(fen,{depth=3,onProgress}={}){
+    const run=()=>new Promise((resolve)=>{ this._ensure(); const id=++this._id; this._cbs[id]={resolve,onProgress}; this.worker.postMessage({id,fen,depth}); });
+    this._queue=this._queue.then(run,run);
     return this._queue;
   }
 }
@@ -952,9 +1260,7 @@ async function fetchPGN(url){
   let lm = url.match(/lichess\.org\/(?:game\/export\/)?([a-zA-Z0-9]{8})/);
   if(lm){
     const id=lm[1];
-    const r=await fetch(`https://lichess.org/game/export/${id}?evals=false&clocks=false&literate=false`,{headers:{'Accept':'application/x-chess-pgn'}});
-    if(!r.ok) throw new Error('تعذّر جلب مباراة Lichess');
-    return await r.text();
+    return await fetchWithProxies(`https://lichess.org/game/export/${id}?evals=false&clocks=false&literate=false`);
   }
   // ---- Chess.com ----
   let cm = url.match(/chess\.com\/game\/(live|daily)\/(\d+)/) || url.match(/chess\.com\/(?:.*\/)?(\d{6,})/);
@@ -1030,20 +1336,23 @@ async function analyzeGame(){
   try{ await engine.init(m=>{ if(m) st.innerHTML='<div class="spinner"></div> '+m; }); }
   catch(err){ st.textContent='⚠️ '+err.message; analyzing=false; $('#analyzeBtn').disabled=false; $('#stopBtn').style.display='none'; return; }
 
-  // تحليل كل وضعية مرة واحدة (multipv=2)
+  // تحليل كل وضعية (المحرك يقيّم جميع النقلات الجذرية، فنحصل على الأفضل والثاني)
+  const total=fens.length;
+  const setPct=(frac)=>{ const p=Math.round(frac*100); $('#analyzeProg').style.width=p+'%'; $('#analyzePct').textContent=p+'%'; };
+  $('#analyzePct').style.display=''; setPct(0);
   const posEval=[]; // {cpBest, second, bestUci} من منظور صاحب الدور في تلك الوضعية
   for(let k=0;k<fens.length;k++){
     if(stopFlag) break;
     // الأوضاع المنتهية (كش مات/تعادل) تُقيّم مباشرة دون المحرك
     let term=null; try{ const c=new Chess(fens[k]); if(c.game_over()){ term = c.in_checkmate() ? -1000000 : 0; } }catch(e){}
-    if(term!==null){ posEval.push({cpBest:term, second:null, bestUci:null}); $('#analyzeProg').style.width=(((k+1)/fens.length)*100).toFixed(1)+'%'; continue; }
-    st.innerHTML=`<div class="spinner"></div> تحليل الوضعية ${k+1}/${fens.length} …`;
-    $('#analyzeProg').style.width=((k/fens.length)*100).toFixed(1)+'%';
-    const res=await engine.analyze(fens[k],{depth,multipv:2});
+    if(term!==null){ posEval.push({cpBest:term, second:null, bestUci:null}); setPct((k+1)/total); continue; }
+    st.innerHTML=`<div class="spinner"></div> تحليل الوضعية ${k+1}/${total} …`;
+    const res=await engine.analyze(fens[k],{depth, onProgress:(f)=>setPct((k+f)/total)});
     const l0=res.lines[0], l1=res.lines[1];
     posEval.push({ cpBest: l0?scoreToCp(l0):0, second: l1?scoreToCp(l1):null, bestUci: (l0&&l0.move)|| res.bestmove });
+    setPct((k+1)/total);
   }
-  if(stopFlag){ st.textContent='⏹️ تم إيقاف التحليل.'; analyzing=false; $('#analyzeBtn').disabled=false; $('#stopBtn').style.display='none'; $('#analyzeProgWrap').style.display='none'; return; }
+  if(stopFlag){ st.textContent='⏹️ تم إيقاف التحليل.'; analyzing=false; $('#analyzeBtn').disabled=false; $('#stopBtn').style.display='none'; $('#analyzeProgWrap').style.display='none'; $('#analyzePct').style.display='none'; return; }
 
   // بناء التصنيفات
   const analyzed=[]; const evalWhite=[];
@@ -1064,7 +1373,7 @@ async function analyzeGame(){
 
   GA={headers, fens, moves:analyzed, evalWhite, startFEN};
   analyzing=false; $('#analyzeBtn').disabled=false; $('#stopBtn').style.display='none';
-  $('#analyzeProgWrap').style.display='none'; st.textContent='✅ اكتمل تحليل '+analyzed.length+' نقلة.';
+  $('#analyzeProgWrap').style.display='none'; $('#analyzePct').style.display='none'; st.textContent='✅ اكتمل تحليل '+analyzed.length+' نقلة.';
   renderAnalysis(); saveHistory(GA);
 }
 
@@ -1155,7 +1464,7 @@ function buildPalette(){
   const order=[['w','k'],['w','q'],['w','r'],['w','b'],['w','n'],['w','p'],
                ['b','k'],['b','q'],['b','r'],['b','b'],['b','n'],['b','p']];
   order.forEach(([c,t])=>{
-    const d=document.createElement('div'); d.className='pp'; d.style.backgroundImage=`url("${pieceUrl(c,t)}")`;
+    const d=document.createElement('div'); d.className='pp '+c; d.textContent=GLYPH[t];
     d.dataset.c=c; d.dataset.t=t;
     d.onclick=()=>selectPalette(d,c,t,false);
     pal.appendChild(d);
@@ -1190,17 +1499,17 @@ async function findBrilliantMoves(){
   if(!legal.length){ toast('لا توجد نقلات قانونية (كش مات/تعادل)'); $('#findStatus').textContent='لا توجد نقلات.'; return; }
 
   const st=$('#findStatus'); const depth=+$('#depthRange2').value;
-  $('#findBtn').disabled=true; $('#findProgWrap').style.display=''; $('#findProg').style.width='10%';
+  $('#findBtn').disabled=true; $('#findProgWrap').style.display=''; $('#findProg').style.width='0%';
+  $('#findPct').style.display=''; $('#findPct').textContent='0%';
   clearFinderResults();
-  try{ await engine.init(m=>{ if(m) st.innerHTML='<div class="spinner"></div> '+m; }); }
-  catch(err){ st.textContent='⚠️ '+err.message; $('#findBtn').disabled=false; $('#findProgWrap').style.display='none'; return; }
+  try{ await engine.init(); }
+  catch(err){ st.textContent='⚠️ '+err.message; $('#findBtn').disabled=false; $('#findProgWrap').style.display='none'; $('#findPct').style.display='none'; return; }
 
   st.innerHTML='<div class="spinner"></div> يفحص المحرك جميع النقلات…';
-  const multipv=Math.min(legal.length, 6);
-  $('#findProg').style.width='45%';
-  const res=await engine.analyze(fen,{depth,multipv});
-  $('#findProg').style.width='90%';
-  const lines=res.lines; if(!lines.length){ st.textContent='تعذّر الحصول على نتائج.'; $('#findBtn').disabled=false; $('#findProgWrap').style.display='none'; return; }
+  const setPct=(f)=>{ const p=Math.round(f*100); $('#findProg').style.width=p+'%'; $('#findPct').textContent=p+'%'; };
+  const res=await engine.analyze(fen,{depth, onProgress:setPct});
+  setPct(1);
+  const lines=res.lines; if(!lines.length){ st.textContent='تعذّر الحصول على نتائج.'; $('#findBtn').disabled=false; $('#findProgWrap').style.display='none'; $('#findPct').style.display='none'; return; }
   const cpBest=scoreToCp(lines[0]); const second=lines[1]?scoreToCp(lines[1]):null;
 
   const found=[]; // {san,from,to,key,cp}
@@ -1218,7 +1527,7 @@ async function findBrilliantMoves(){
   let label='Brilliant';
   if(!show.length){ show=found.filter(f=>f.key==='Great'); label='Great'; }
 
-  $('#findProg').style.width='100%'; setTimeout(()=>$('#findProgWrap').style.display='none',400);
+  $('#findProg').style.width='100%'; setTimeout(()=>{$('#findProgWrap').style.display='none'; $('#findPct').style.display='none';},500);
   $('#findBtn').disabled=false;
   const out=$('#brilliantResults');
   if(!show.length){
@@ -1286,7 +1595,7 @@ $('#loadPuzzleBtn').addEventListener('click', loadDailyPuzzle);
 async function loadDailyPuzzle(){
   const st=$('#puzzleStatus'); st.innerHTML='<div class="spinner"></div> تحميل اللغز…';
   try{
-    const r=await fetch('https://lichess.org/api/puzzle/daily'); const d=await r.json();
+    const txt=await fetchWithProxies('https://lichess.org/api/puzzle/daily'); const d=JSON.parse(txt);
     const pgn=d.game.pgn; const initialPly=d.puzzle.initialPly; const solution=d.puzzle.solution.slice();
     // إعادة تشغيل المباراة حتى وضع اللغز
     const ch=new Chess();
