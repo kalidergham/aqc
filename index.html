@@ -1,0 +1,1992 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#1f2630" />
+<title>محلل الشطرنج | Chess Analyzer</title>
+<!--
+  =====================================================================
+  محلل الشطرنج الشامل - Single File Chess Analyzer
+  ---------------------------------------------------------------------
+  - ملف HTML واحد فقط، جاهز للرفع على GitHub Pages بدون أي backend.
+  - يستخدم محرك Stockfish عبر WebAssembly/asm.js محلياً في المتصفح.
+  - يجلب مباريات Lichess مباشرة (CORS مدعوم) ومباريات Chess.com عبر بروكسي
+    أو عبر لصق الـ PGN يدوياً.
+  - تصنيف النقلات (Brilliant/Great/Best/Excellent/Good/Inaccuracy/Mistake/Blunder)
+    مبني على منطق تقريبي (heuristic) فوق تقييمات Stockfish.
+  ملاحظة: تصنيف Brilliant/Great هنا تقريبي وليس مطابقاً 100% لنظام chess.com الداخلي.
+  =====================================================================
+-->
+<style>
+/* ====================== متغيّرات الثيم (قابلة للتخصيص) ====================== */
+:root{
+  --bg:#161b22;
+  --bg-2:#1f2630;
+  --surface:#242c38;
+  --surface-2:#2c3543;
+  --text:#e8edf2;
+  --text-dim:#9aa7b4;
+  --primary:#3a9d7a;
+  --primary-2:#46c39a;
+  --accent:#f0a830;
+  --border:rgba(255,255,255,.08);
+  --shadow:0 10px 30px rgba(0,0,0,.35);
+  --board-light:#e9d8b5;
+  --board-dark:#9c7a4e;
+  --radius:16px;
+  --radius-sm:10px;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+/* تصنيفات النقلات (ألوان معروفة شبيهة بـ chess.com) */
+:root{
+  --c-brilliant:#1baca6;
+  --c-great:#5c8bb0;
+  --c-best:#81b64c;
+  --c-excellent:#95bb4a;
+  --c-good:#a3b06d;
+  --c-book:#b08d57;
+  --c-inaccuracy:#f0c049;
+  --c-mistake:#e58f2a;
+  --c-blunder:#ca3431;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:"Segoe UI",system-ui,-apple-system,"Tahoma","Cairo",sans-serif;
+  background:linear-gradient(160deg,var(--bg),var(--bg-2));
+  color:var(--text);
+  min-height:100vh;
+  overscroll-behavior-y:contain;
+  -webkit-font-smoothing:antialiased;
+  padding-top:var(--safe-top);
+  padding-bottom:calc(var(--safe-bottom) + 72px);
+}
+button{font-family:inherit;cursor:pointer;}
+a{color:var(--primary-2);}
+
+/* ============================== الهيدر ============================== */
+header.app-head{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;gap:10px;
+  padding:12px 14px;
+  background:rgba(22,27,34,.85);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+}
+.app-head .logo{
+  width:34px;height:34px;border-radius:9px;flex:0 0 auto;
+  background:linear-gradient(135deg,var(--primary),var(--primary-2));
+  display:grid;place-items:center;font-size:20px;color:#fff;
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
+}
+.app-head h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.2px;}
+.app-head .sub{font-size:11px;color:var(--text-dim);margin-top:1px;}
+.app-head .spacer{flex:1;}
+.icon-btn{
+  width:38px;height:38px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface);color:var(--text);font-size:17px;
+  display:grid;place-items:center;transition:.2s;
+}
+.icon-btn:active{transform:scale(.9);}
+
+/* ============================== التبويبات ============================== */
+nav.tabs{
+  position:fixed;bottom:0;left:0;right:0;z-index:50;
+  display:flex;justify-content:space-around;align-items:stretch;
+  background:rgba(22,27,34,.92);
+  backdrop-filter:blur(14px);
+  border-top:1px solid var(--border);
+  padding-bottom:var(--safe-bottom);
+}
+nav.tabs button{
+  flex:1;background:none;border:none;color:var(--text-dim);
+  padding:9px 2px 10px;font-size:10px;font-weight:600;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  transition:.2s;position:relative;
+}
+nav.tabs button .ic{font-size:20px;line-height:1;}
+nav.tabs button.active{color:var(--primary-2);}
+nav.tabs button.active::before{
+  content:"";position:absolute;top:0;left:22%;right:22%;height:3px;
+  border-radius:3px;background:var(--primary-2);
+}
+
+/* ============================== الأقسام ============================== */
+main{max-width:560px;margin:0 auto;padding:14px;}
+.view{display:none;animation:fadeUp .35s ease both;}
+.view.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px;margin-bottom:14px;
+  box-shadow:var(--shadow);
+}
+.card h2{font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+.card .hint{font-size:12px;color:var(--text-dim);line-height:1.6;margin:0 0 10px;}
+
+label.fld{display:block;font-size:12px;color:var(--text-dim);margin:10px 0 5px;}
+input[type=text],input[type=url],textarea,select{
+  width:100%;background:var(--bg-2);border:1px solid var(--border);
+  color:var(--text);border-radius:var(--radius-sm);padding:11px 12px;
+  font-size:14px;outline:none;transition:.2s;font-family:inherit;
+}
+input:focus,textarea:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(70,195,154,.15);}
+textarea{resize:vertical;min-height:80px;direction:ltr;text-align:left;}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border:none;border-radius:var(--radius-sm);padding:12px 16px;
+  font-size:14px;font-weight:700;color:#fff;width:100%;
+  background:linear-gradient(135deg,var(--primary),var(--primary-2));
+  box-shadow:0 6px 16px rgba(58,157,122,.35);transition:.18s;
+}
+.btn:active{transform:translateY(1px) scale(.99);}
+.btn:disabled{opacity:.5;filter:grayscale(.4);box-shadow:none;}
+.btn.secondary{background:var(--surface-2);color:var(--text);box-shadow:none;border:1px solid var(--border);}
+.btn.ghost{background:transparent;color:var(--primary-2);box-shadow:none;border:1px solid var(--border);}
+.btn-row{display:flex;gap:8px;margin-top:10px;}
+.btn-row .btn{width:auto;flex:1;}
+
+/* ============================== الرقعة ============================== */
+.board-wrap{position:relative;width:100%;max-width:440px;margin:0 auto;}
+.board{
+  position:relative;width:100%;aspect-ratio:1/1;border-radius:10px;overflow:hidden;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);touch-action:none;user-select:none;
+}
+.board .sq{position:absolute;width:12.5%;height:12.5%;}
+.board .sq.light{background:var(--board-light);}
+.board .sq.dark{background:var(--board-dark);}
+.board .sq .coord{position:absolute;font-size:9px;font-weight:800;padding:1px 3px;pointer-events:none;}
+/* لون الإحداثيات يكون عكس لون المربع لضمان التباين مع كل الثيمات */
+.board .sq.light .coord{color:var(--board-dark);}
+.board .sq.dark .coord{color:var(--board-light);}
+.board .sq .coord.file{bottom:0;right:2px;}
+.board .sq .coord.rank{top:0;left:2px;}
+.board .piece{
+  position:absolute;width:12.5%;height:12.5%;
+  display:grid;place-items:center;font-size:0.82em;line-height:1;
+  z-index:5;transition:left .22s ease,top .22s ease;will-change:left,top;
+  touch-action:none;cursor:grab;
+}
+.board .piece.w{color:#f7f7f2;text-shadow:0 0 2px #000,0 1px 2px rgba(0,0,0,.7),1px 0 1px #000,-1px 0 1px #000;}
+.board .piece.b{color:#2a2a2e;text-shadow:0 0 2px rgba(255,255,255,.55),0 1px 2px rgba(0,0,0,.5);}
+.board .piece.dragging{z-index:30;transition:none;cursor:grabbing;filter:drop-shadow(0 6px 8px rgba(0,0,0,.5));}
+.board .hl-from,.board .hl-to{position:absolute;width:12.5%;height:12.5%;background:rgba(240,168,48,.45);z-index:2;}
+.board .hint-dot{position:absolute;width:12.5%;height:12.5%;z-index:3;pointer-events:none;}
+.board .hint-dot::after{content:"";position:absolute;inset:33%;border-radius:50%;background:rgba(0,0,0,.25);}
+.board .hint-dot.cap::after{inset:6%;border-radius:50%;background:transparent;border:5px solid rgba(0,0,0,.25);}
+.board .badge{
+  position:absolute;width:22px;height:22px;border-radius:50%;z-index:20;
+  display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff;
+  transform:translate(35%,-35%);box-shadow:0 2px 6px rgba(0,0,0,.4);
+  border:2px solid rgba(255,255,255,.85);
+}
+
+/* شريط التقييم */
+.evalbar{
+  width:18px;border-radius:6px;overflow:hidden;background:#3a3a3a;
+  position:relative;align-self:stretch;flex:0 0 auto;min-height:120px;
+}
+.evalbar .white{position:absolute;bottom:0;left:0;right:0;background:#f3f3f3;transition:height .3s;}
+.evalbar .txt{position:absolute;left:0;right:0;text-align:center;font-size:9px;font-weight:800;color:#111;bottom:2px;z-index:2;}
+.evalbar .txt.neg{color:#fff;top:2px;bottom:auto;}
+.board-row{display:flex;gap:8px;align-items:stretch;}
+
+/* لوحة التحكم بالنقلات */
+.controls{display:flex;gap:6px;margin-top:12px;justify-content:center;}
+.controls button{
+  flex:1;max-width:64px;height:42px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface-2);color:var(--text);font-size:16px;transition:.15s;
+}
+.controls button:active{background:var(--primary);}
+
+/* قائمة النقلات */
+.movelist{margin-top:12px;max-height:240px;overflow:auto;border:1px solid var(--border);border-radius:10px;}
+.movelist table{width:100%;border-collapse:collapse;font-size:13px;}
+.movelist td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);}
+.movelist td.num{color:var(--text-dim);width:34px;text-align:center;background:var(--bg-2);}
+.movelist td.mv{cursor:pointer;white-space:nowrap;}
+.movelist td.mv:hover{background:var(--surface-2);}
+.movelist td.mv.current{background:var(--primary);color:#fff;border-radius:6px;}
+.mv .sym{font-weight:800;margin-inline-start:4px;}
+
+/* رقائق التصنيف */
+.classchip{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:20px;font-size:12px;font-weight:700;color:#fff;}
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+.summary-grid .col{background:var(--bg-2);border-radius:10px;padding:10px;}
+.summary-grid .col h4{margin:0 0 8px;font-size:13px;}
+.statline{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:3px 0;}
+.statline .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-inline-end:6px;}
+.acc{font-size:26px;font-weight:800;text-align:center;}
+
+/* لوحة الحالة/التقدم */
+.statusbar{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim);margin-top:10px;min-height:18px;}
+.spinner{width:15px;height:15px;border:2px solid var(--border);border-top-color:var(--primary-2);border-radius:50%;animation:spin .8s linear infinite;flex:0 0 auto;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.progress{height:6px;border-radius:6px;background:var(--bg-2);overflow:hidden;margin-top:8px;}
+.progress > div{height:100%;width:0;background:linear-gradient(90deg,var(--primary),var(--primary-2));transition:width .2s;}
+
+/* محرّر القطع (palette) */
+.palette{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:10px;}
+.palette .pp{
+  aspect-ratio:1/1;border-radius:10px;background:var(--bg-2);border:1px solid var(--border);
+  display:grid;place-items:center;font-size:24px;line-height:1;touch-action:none;
+}
+.palette .pp.w{color:#f7f7f2;text-shadow:0 0 2px #000,0 1px 2px rgba(0,0,0,.7);}
+.palette .pp.b{color:#2a2a2e;text-shadow:0 0 2px rgba(255,255,255,.55);}
+.palette .pp.sel{border-color:var(--primary-2);box-shadow:0 0 0 2px var(--primary-2) inset;}
+.palette .pp.trash{display:grid;place-items:center;font-size:20px;color:var(--c-blunder);background:var(--surface-2);}
+
+.seg{display:flex;background:var(--bg-2);border-radius:10px;padding:3px;gap:3px;margin-top:6px;}
+.seg button{flex:1;border:none;background:none;color:var(--text-dim);padding:9px;border-radius:8px;font-size:13px;font-weight:600;transition:.18s;}
+.seg button.active{background:var(--primary);color:#fff;}
+
+/* نتائج النقلات الرائعة */
+.brilliant-card{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;margin-top:10px;border:1px solid var(--border);background:var(--bg-2);}
+.brilliant-card .mvbig{font-size:20px;font-weight:800;direction:ltr;}
+.brilliant-card .tag{margin-inline-start:auto;}
+
+/* الثيم: لوحة الألوان */
+.swatches{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;}
+.swatch{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11px;color:var(--text-dim);}
+.swatch input[type=color]{width:46px;height:46px;border:none;border-radius:12px;background:none;padding:0;cursor:pointer;}
+.theme-presets{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.theme-presets .tp{flex:1;min-width:70px;border-radius:10px;padding:8px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-size:12px;font-weight:600;}
+
+.toast{
+  position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);
+  background:var(--surface-2);color:var(--text);padding:11px 18px;border-radius:24px;
+  font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.3s;z-index:100;
+  border:1px solid var(--border);max-width:90%;text-align:center;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+.pill{display:inline-block;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;background:var(--surface-2);color:var(--text-dim);border:1px solid var(--border);}
+.note{font-size:11px;color:var(--text-dim);line-height:1.6;background:var(--bg-2);border-radius:10px;padding:9px 11px;margin-top:10px;border:1px dashed var(--border);}
+.row2{display:flex;gap:10px;}
+.row2 > *{flex:1;}
+hr.sep{border:none;border-top:1px solid var(--border);margin:14px 0;}
+.empty{text-align:center;color:var(--text-dim);font-size:13px;padding:24px 10px;}
+.hist-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;background:var(--bg-2);margin-top:8px;border:1px solid var(--border);}
+.hist-item .meta{flex:1;min-width:0;}
+.hist-item .meta b{font-size:13px;}
+.hist-item .meta span{display:block;font-size:11px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hist-item button{border:none;background:none;color:var(--c-blunder);font-size:18px;}
+.lang-en{direction:ltr;}
+</style>
+</head>
+<body>
+
+<!-- ============================== الهيدر ============================== -->
+<header class="app-head">
+  <div class="logo">♞</div>
+  <div>
+    <h1 data-i18n="appTitle">محلل الشطرنج</h1>
+    <div class="sub" data-i18n="appSub">تحليل احترافي بمحرك Stockfish</div>
+  </div>
+  <div class="spacer"></div>
+  <button class="icon-btn" id="langBtn" title="Language">EN</button>
+  <button class="icon-btn" id="themeBtn" title="Theme">🎨</button>
+</header>
+
+<main>
+  <!-- ===================== القسم 1: تحليل المباريات ===================== -->
+  <section class="view active" id="view-analyze">
+    <div class="card">
+      <h2>🔍 <span data-i18n="t1_title">تحليل مباراة</span></h2>
+      <p class="hint" data-i18n="t1_hint">الصق رابط مباراة من Lichess (يُجلب تلقائياً) أو رابط Chess.com، أو الصق نص الـ PGN مباشرة. ثم اضغط تحليل ليقوم محرك Stockfish بفحص كل نقلة.</p>
+
+      <label class="fld" data-i18n="t1_url">رابط المباراة (Lichess / Chess.com)</label>
+      <input type="url" id="gameUrl" placeholder="https://lichess.org/...  |  https://www.chess.com/game/live/..." dir="ltr" />
+      <div class="btn-row">
+        <button class="btn secondary" id="fetchBtn">⬇️ <span data-i18n="t1_fetch">جلب الـPGN</span></button>
+      </div>
+
+      <label class="fld">PGN</label>
+      <textarea id="pgnInput" placeholder="[Event ...] 1. e4 e5 2. Nf3 ..." rows="4"></textarea>
+
+      <label class="fld" data-i18n="t1_depth">مستوى التحليل (1 سريع … 5 أعمق): <b id="depthVal">3</b></label>
+      <input type="range" id="depthRange" min="1" max="5" value="3" style="width:100%" />
+
+      <div class="btn-row">
+        <button class="btn" id="analyzeBtn">⚙️ <span data-i18n="t1_analyze">تحليل المباراة</span></button>
+        <button class="btn secondary" id="stopBtn" style="display:none">⏹️ <span data-i18n="stop">إيقاف</span></button>
+      </div>
+      <div class="statusbar" id="analyzeStatus"></div>
+      <div class="progress" id="analyzeProgWrap" style="display:none"><div id="analyzeProg"></div></div>
+      <div id="analyzePct" style="display:none;text-align:center;font-weight:800;font-size:13px;margin-top:6px;color:var(--primary-2)">0%</div>
+    </div>
+
+    <div class="card" id="boardCard1" style="display:none">
+      <div class="board-row">
+        <div class="evalbar" id="evalBar1"><div class="white" style="height:50%"></div><div class="txt">0.0</div></div>
+        <div class="board-wrap" style="flex:1">
+          <div class="board" id="board1"></div>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="navStart">⏮</button>
+        <button id="navPrev">◀</button>
+        <button id="navFlip">⟲</button>
+        <button id="navNext">▶</button>
+        <button id="navEnd">⏭</button>
+      </div>
+      <div id="moveInfo" class="statusbar" style="justify-content:center;font-weight:700"></div>
+      <div class="movelist" id="moveList"></div>
+    </div>
+
+    <div class="card" id="summaryCard" style="display:none">
+      <h2>📊 <span data-i18n="summary">ملخص التحليل</span></h2>
+      <canvas id="evalChart" width="520" height="120" style="width:100%;height:120px;background:var(--bg-2);border-radius:10px;margin-bottom:10px"></canvas>
+      <div class="summary-grid">
+        <div class="col"><h4>♔ <span data-i18n="white">الأبيض</span></h4><div class="acc" id="accWhite">--</div><div style="text-align:center;font-size:11px;color:var(--text-dim)" data-i18n="accuracy">الدقة</div><div id="statsWhite"></div></div>
+        <div class="col"><h4>♚ <span data-i18n="black">الأسود</span></h4><div class="acc" id="accBlack">--</div><div style="text-align:center;font-size:11px;color:var(--text-dim)" data-i18n="accuracy">الدقة</div><div id="statsBlack"></div></div>
+      </div>
+      <div class="note" data-i18n="approxNote">⚠️ التصنيفات (خصوصاً Brilliant وGreat) تقريبية ومبنية على منطق حسابي فوق تقييمات Stockfish، وقد تختلف عن نظام chess.com الرسمي غير المعلن.</div>
+    </div>
+  </section>
+
+  <!-- ===================== القسم 2: الباحث عن النقلات الرائعة ===================== -->
+  <section class="view" id="view-brilliant">
+    <div class="card">
+      <h2>✨ <span data-i18n="t2_title">الباحث عن النقلة العبقرية</span></h2>
+      <p class="hint" data-i18n="t2_hint">رتّب القطع بحرية على الرقعة (اسحب وأفلِت)، اختر دور اللعب، ثم اضغط «بحث» ليفحص Stockfish كل النقلات الممكنة ويُظهر فقط النقلات المصنّفة Brilliant (‼) أو Great (!).</p>
+
+      <div class="seg" id="sideSeg">
+        <button data-side="w" class="active" data-i18n="whiteToMove">دور الأبيض</button>
+        <button data-side="b" data-i18n="blackToMove">دور الأسود</button>
+      </div>
+
+      <div class="board-wrap" style="margin-top:12px">
+        <div class="board" id="board2"></div>
+      </div>
+
+      <div class="palette" id="palette"></div>
+      <div class="btn-row">
+        <button class="btn ghost" id="flipBoard2Btn" data-i18n="flipBoard">⟲ قلب الرقعة</button>
+        <button class="btn ghost" id="startPosBtn" data-i18n="startPos">الوضع الابتدائي</button>
+        <button class="btn ghost" id="clearBoardBtn" data-i18n="clearBoard">تفريغ الرقعة</button>
+      </div>
+
+      <label class="fld" data-i18n="t2_depth">مستوى البحث (1 سريع … 5 أعمق): <b id="depthVal2">5</b></label>
+      <input type="range" id="depthRange2" min="1" max="5" value="5" style="width:100%" />
+
+      <div class="btn-row">
+        <button class="btn" id="findBtn">✨ <span data-i18n="t2_find">ابحث عن النقلات الرائعة</span></button>
+      </div>
+      <div class="statusbar" id="findStatus"></div>
+      <div class="progress" id="findProgWrap" style="display:none"><div id="findProg"></div></div>
+      <div id="findPct" style="display:none;text-align:center;font-weight:800;font-size:13px;margin-top:6px;color:var(--primary-2)">0%</div>
+      <div id="brilliantResults"></div>
+      <div class="note" data-i18n="approxNote2">⚠️ تعريف Brilliant/Great غير موثّق رسمياً من chess.com. هنا نعتبر النقلة Brilliant إذا كانت تضحية مادية (sacrifice) وتظل من أفضل النقلات وتحافظ على أفضلية، وGreat إذا كانت النقلة الجيدة الوحيدة تقريباً في موقف حرج.</div>
+    </div>
+
+    <div class="card">
+      <h2>🌐 <span data-i18n="ext_title">رأي محرك خارجي + مراجعة محرّكك</span></h2>
+      <p class="hint" data-i18n="ext_hint">يجلب أفضل نقلة من محرك Stockfish خارجي (REST API) للوضع الحالي على الرقعة، ثم يراجعها محرّكك المحلي ويصنّفها ويقارن. (يحتاج إنترنت لجلب الرأي الخارجي فقط.)</p>
+      <div class="btn-row">
+        <button class="btn" id="extBtn">🌐 <span data-i18n="ext_get">أفضل نقلة (محرك خارجي) + مراجعة</span></button>
+      </div>
+      <div class="statusbar" id="extStatus"></div>
+      <div id="extResult"></div>
+      <div class="note" data-i18n="ext_note">ℹ️ موقع chessigma لا يوفّر API (يشغّل Stockfish داخل المتصفح فقط)، لذا نستخدم محرك Stockfish سحابياً مجانياً (stockfish.online ومع بديل chess-api.com) للحصول على نفس النتيجة القوية.</div>
+    </div>
+  </section>
+
+  <!-- ===================== القسم 3: تمرين تكتيكي يومي ===================== -->
+  <section class="view" id="view-puzzle">
+    <div class="card">
+      <h2>🧩 <span data-i18n="t3_title">لغز اليوم التكتيكي</span></h2>
+      <p class="hint" data-i18n="t3_hint">لغز يومي من Lichess. جِد أفضل نقلة ونفّذها على الرقعة. صحّتها تُفحص بالتسلسل الصحيح.</p>
+      <div class="btn-row"><button class="btn secondary" id="loadPuzzleBtn">🔄 <span data-i18n="t3_load">تحميل لغز اليوم</span></button></div>
+      <div class="statusbar" id="puzzleStatus"></div>
+      <div class="board-wrap" id="puzzleBoardWrap" style="margin-top:12px;display:none">
+        <div class="board" id="board3"></div>
+      </div>
+      <div id="puzzleInfo" style="text-align:center;font-weight:700;margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- ===================== القسم 4: السجل ===================== -->
+  <section class="view" id="view-history">
+    <div class="card">
+      <h2>🗂️ <span data-i18n="t4_title">سجل التحليلات</span></h2>
+      <p class="hint" data-i18n="t4_hint">تُحفظ تحليلاتك السابقة محلياً في متصفحك. اضغط على أي عنصر لإعادة تحميله.</p>
+      <div id="historyList"></div>
+    </div>
+  </section>
+
+  <!-- ===================== القسم 5: الإعدادات والثيم ===================== -->
+  <section class="view" id="view-settings">
+    <div class="card">
+      <h2>🎨 <span data-i18n="t5_title">تخصيص المظهر</span></h2>
+      <p class="hint" data-i18n="t5_hint">غيّر ألوان الموقع ولون الرقعة. تُحفظ تفضيلاتك تلقائياً.</p>
+      <div class="swatches">
+        <label class="swatch"><input type="color" data-var="--primary" /><span data-i18n="c_primary">الأساسي</span></label>
+        <label class="swatch"><input type="color" data-var="--primary-2" /><span data-i18n="c_primary2">الأساسي الفاتح</span></label>
+        <label class="swatch"><input type="color" data-var="--accent" /><span data-i18n="c_accent">التمييز</span></label>
+        <label class="swatch"><input type="color" data-var="--bg" /><span data-i18n="c_bg">الخلفية</span></label>
+        <label class="swatch"><input type="color" data-var="--surface" /><span data-i18n="c_surface">البطاقات</span></label>
+        <label class="swatch"><input type="color" data-var="--board-light" /><span data-i18n="c_blight">الرقعة فاتح</span></label>
+        <label class="swatch"><input type="color" data-var="--board-dark" /><span data-i18n="c_bdark">الرقعة غامق</span></label>
+      </div>
+      <div class="theme-presets" id="themePresets"></div>
+      <hr class="sep" />
+      <h2>🌐 <span data-i18n="language">اللغة</span></h2>
+      <div class="seg" id="langSeg">
+        <button data-lang="ar" class="active">العربية</button>
+        <button data-lang="en">English</button>
+      </div>
+      <div class="btn-row"><button class="btn ghost" id="resetThemeBtn" data-i18n="resetTheme">إعادة الضبط الافتراضي</button></div>
+    </div>
+    <div class="card">
+      <h2>ℹ️ <span data-i18n="about">حول</span></h2>
+      <p class="hint" data-i18n="aboutText">ملف HTML واحد يعمل بالكامل في المتصفح. يستخدم Stockfish (WASM/JS) للتحليل، وواجهات Lichess وChess.com العامة لجلب المباريات. لا يوجد خادم خلفي.</p>
+      <div class="note" data-i18n="engineNote">يتم تحميل محرك Stockfish من شبكة CDN عند أول استخدام. تأكد من اتصالك بالإنترنت في أول مرة.</div>
+    </div>
+  </section>
+</main>
+
+<!-- ============================== شريط التبويبات السفلي ============================== -->
+<nav class="tabs">
+  <button class="active" data-view="view-analyze"><span class="ic">🔍</span><span data-i18n="tab1">تحليل</span></button>
+  <button data-view="view-brilliant"><span class="ic">✨</span><span data-i18n="tab2">العبقرية</span></button>
+  <button data-view="view-puzzle"><span class="ic">🧩</span><span data-i18n="tab3">لغز</span></button>
+  <button data-view="view-history"><span class="ic">🗂️</span><span data-i18n="tab4">السجل</span></button>
+  <button data-view="view-settings"><span class="ic">⚙️</span><span data-i18n="tab5">إعدادات</span></button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<!-- نواة الشطرنج الكاملة مدمجة داخل الملف (تعمل بدون إنترنت، بدون أي مكتبة خارجية) -->
+<script>
+window.Chess=(function(){
+/* Self-contained 0x88 chess core (drop-in subset of chess.js API) */
+'use strict';
+const EMPTY=0, P=1,N=2,B=3,R=4,Q=5,K=6;
+const WK=1,WQ=2,BK=4,BQ=8;
+const KN_OFF=[-18,-33,-31,-14,18,33,31,14];
+const B_OFF=[-17,-15,17,15];
+const R_OFF=[-16,16,-1,1];
+const K_OFF=[-17,-16,-15,-1,1,15,16,17];
+const FILES=['a','b','c','d','e','f','g','h'];
+function f_(sq){return sq&7;} function r_(sq){return sq>>4;}
+function alg(sq){return FILES[f_(sq)]+(r_(sq)+1);}
+function sqFromAlg(s){return (parseInt(s[1])-1)*16 + FILES.indexOf(s[0]);}
+function onBoard(sq){return (sq&0x88)===0;}
+const SYM={1:'p',2:'n',3:'b',4:'r',5:'q',6:'k'};
+const FROMSYM={p:1,n:2,b:3,r:4,q:5,k:6};
+
+class Chess{
+  constructor(fen){ this.headers={}; this.reset(); if(fen){ this.load(fen);} else { this.load('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'); } }
+  reset(){ this.board=new Int8Array(128); this._turn='w'; this.castling=0; this.ep=-1; this.half=0; this.moveno=1; this.kings={w:-1,b:-1}; this._hist=[]; this._sans=[]; }
+  validate_fen(fen){
+    const parts=fen.trim().split(/\s+/); if(parts.length<4) return {valid:false,error:'حقول ناقصة'};
+    const rows=parts[0].split('/'); if(rows.length!==8) return {valid:false,error:'عدد الصفوف غير صحيح'};
+    for(const row of rows){ let c=0; for(const ch of row){ if(/\d/.test(ch))c+=+ch; else if(/[prnbqkPRNBQK]/.test(ch))c++; else return {valid:false,error:'حرف غير صالح'}; } if(c!==8) return {valid:false,error:'صف بطول خاطئ'}; }
+    if(!/^[wb]$/.test(parts[1])) return {valid:false,error:'دور غير صحيح'};
+    return {valid:true,error:null};
+  }
+  load(fen){
+    const v=this.validate_fen(fen); if(!v.valid) return false;
+    this.reset();
+    const parts=fen.trim().split(/\s+/); const rows=parts[0].split('/');
+    for(let r=0;r<8;r++){ let file=0; for(const ch of rows[r]){ if(/\d/.test(ch)){file+=+ch;} else { const color=ch===ch.toUpperCase()?1:-1; const t=FROMSYM[ch.toLowerCase()]; const sq=(7-r)*16+file; this.board[sq]=color*t; if(t===K){ this.kings[color===1?'w':'b']=sq; } file++; } } }
+    this._turn=parts[1];
+    if(parts[2]&&parts[2]!=='-'){ if(parts[2].includes('K'))this.castling|=WK; if(parts[2].includes('Q'))this.castling|=WQ; if(parts[2].includes('k'))this.castling|=BK; if(parts[2].includes('q'))this.castling|=BQ; }
+    this.ep = (parts[3]&&parts[3]!=='-')?sqFromAlg(parts[3]):-1;
+    this.half = parts[4]?parseInt(parts[4]):0; this.moveno=parts[5]?parseInt(parts[5]):1;
+    return true;
+  }
+  fen(){
+    let s=''; for(let r=7;r>=0;r--){ let empty=0; for(let f=0;f<8;f++){ const pc=this.board[r*16+f]; if(pc===0){empty++;} else { if(empty){s+=empty;empty=0;} let l=SYM[Math.abs(pc)]; s+= pc>0?l.toUpperCase():l; } } if(empty)s+=empty; if(r)s+='/'; }
+    let cr=''; if(this.castling&WK)cr+='K'; if(this.castling&WQ)cr+='Q'; if(this.castling&BK)cr+='k'; if(this.castling&BQ)cr+='q'; if(!cr)cr='-';
+    return s+' '+this._turn+' '+cr+' '+(this.ep>=0?alg(this.ep):'-')+' '+this.half+' '+this.moveno;
+  }
+  turnColor(){ return this._turn==='w'?1:-1; }
+  turn(){ return this._turn; }
+  _isAttacked(sq, bySign){
+    if(bySign===1){ if(onBoard(sq-17)&&this.board[sq-17]===P) return true; if(onBoard(sq-15)&&this.board[sq-15]===P) return true; }
+    else { if(onBoard(sq+17)&&this.board[sq+17]===-P) return true; if(onBoard(sq+15)&&this.board[sq+15]===-P) return true; }
+    for(const o of KN_OFF){ const t=sq+o; if(onBoard(t)&&this.board[t]===bySign*N) return true; }
+    for(const o of K_OFF){ const t=sq+o; if(onBoard(t)&&this.board[t]===bySign*K) return true; }
+    for(const o of B_OFF){ let t=sq+o; while(onBoard(t)){ const pc=this.board[t]; if(pc!==0){ if(pc===bySign*B||pc===bySign*Q) return true; break; } t+=o; } }
+    for(const o of R_OFF){ let t=sq+o; while(onBoard(t)){ const pc=this.board[t]; if(pc!==0){ if(pc===bySign*R||pc===bySign*Q) return true; break; } t+=o; } }
+    return false;
+  }
+  in_check(){ const us=this.turnColor(); const ks=this.kings[this._turn]; return this._isAttacked(ks, -us); }
+  _genPseudo(onlyFrom){
+    const us=this.turnColor(); const moves=[];
+    const add=(from,to,flags,promo)=>{ moves.push({from,to,flags,promotion:promo}); };
+    for(let sq=0;sq<128;sq++){ if(!onBoard(sq))continue; const pc=this.board[sq]; if(pc===0||Math.sign(pc)!==us)continue; if(onlyFrom!=null&&sq!==onlyFrom)continue; const t=Math.abs(pc);
+      if(t===P){ const dir=us===1?16:-16; const startRank=us===1?1:6; const promoRank=us===1?6:1;
+        const one=sq+dir; if(onBoard(one)&&this.board[one]===0){ if(r_(sq)===promoRank){ for(const pr of [Q,R,B,N]) add(sq,one,'np',pr);} else { add(sq,one,'n'); if(r_(sq)===startRank){ const two=sq+2*dir; if(this.board[two]===0) add(sq,two,'b'); } } }
+        for(const dc of [dir-1,dir+1]){ const tt=sq+dc; if(!onBoard(tt))continue; const cap=this.board[tt]; if(cap!==0&&Math.sign(cap)===-us){ if(r_(sq)===promoRank){ for(const pr of [Q,R,B,N]) add(sq,tt,'cp',pr);} else add(sq,tt,'c'); } else if(tt===this.ep){ add(sq,tt,'e'); } }
+      } else if(t===N){ for(const o of KN_OFF){ const tt=sq+o; if(!onBoard(tt))continue; const cap=this.board[tt]; if(cap===0)add(sq,tt,'n'); else if(Math.sign(cap)===-us)add(sq,tt,'c'); } }
+      else if(t===K){ for(const o of K_OFF){ const tt=sq+o; if(!onBoard(tt))continue; const cap=this.board[tt]; if(cap===0)add(sq,tt,'n'); else if(Math.sign(cap)===-us)add(sq,tt,'c'); }
+        if(us===1&&sq===4){ if((this.castling&WK)&&this.board[5]===0&&this.board[6]===0&&this.board[7]===R&&!this._isAttacked(4,-1)&&!this._isAttacked(5,-1)&&!this._isAttacked(6,-1)) add(4,6,'k'); if((this.castling&WQ)&&this.board[3]===0&&this.board[2]===0&&this.board[1]===0&&this.board[0]===R&&!this._isAttacked(4,-1)&&!this._isAttacked(3,-1)&&!this._isAttacked(2,-1)) add(4,2,'q'); }
+        if(us===-1&&sq===116){ if((this.castling&BK)&&this.board[117]===0&&this.board[118]===0&&this.board[119]===-R&&!this._isAttacked(116,1)&&!this._isAttacked(117,1)&&!this._isAttacked(118,1)) add(116,118,'k'); if((this.castling&BQ)&&this.board[115]===0&&this.board[114]===0&&this.board[113]===0&&this.board[112]===-R&&!this._isAttacked(116,1)&&!this._isAttacked(115,1)&&!this._isAttacked(114,1)) add(116,114,'q'); }
+      } else { const offs = t===B?B_OFF:t===R?R_OFF:K_OFF; for(const o of offs){ let tt=sq+o; while(onBoard(tt)){ const cap=this.board[tt]; if(cap===0)add(sq,tt,'n'); else { if(Math.sign(cap)===-us)add(sq,tt,'c'); break; } tt+=o; } } }
+    }
+    return moves;
+  }
+  _makeRaw(m){
+    const us=this.turnColor(); const piece=this.board[m.from]; const undo={m, captured:0, capSq:-1, castling:this.castling, ep:this.ep, half:this.half, moveno:this.moveno, king:this.kings[this._turn]};
+    this.ep=-1;
+    if(m.flags.includes('e')){ const capSq=m.to-(us===1?16:-16); undo.captured=this.board[capSq]; undo.capSq=capSq; this.board[capSq]=0; }
+    else if(this.board[m.to]!==0){ undo.captured=this.board[m.to]; undo.capSq=m.to; }
+    this.board[m.to]=piece; this.board[m.from]=0;
+    if(m.promotion){ this.board[m.to]=us*m.promotion; }
+    if(Math.abs(piece)===K){ this.kings[this._turn]=m.to; if(m.flags.includes('k')){ this.board[m.to-1]=us*R; this.board[m.to+1]=0; } if(m.flags.includes('q')){ this.board[m.to+1]=us*R; this.board[m.to-2]=0; } }
+    if(m.flags.includes('b')) this.ep=m.from+(us===1?16:-16);
+    if(piece===K){ this.castling&=~(WK|WQ);} if(piece===-K){ this.castling&=~(BK|BQ);}
+    if(m.from===0||m.to===0)this.castling&=~WQ; if(m.from===7||m.to===7)this.castling&=~WK; if(m.from===112||m.to===112)this.castling&=~BQ; if(m.from===119||m.to===119)this.castling&=~BK;
+    this.half = (Math.abs(piece)===P||undo.captured!==0)?0:this.half+1;
+    if(this._turn==='b')this.moveno++;
+    this._turn = this._turn==='w'?'b':'w';
+    this._hist.push(undo); return undo;
+  }
+  _unmakeRaw(){
+    const undo=this._hist.pop(); if(!undo)return; const m=undo.m;
+    this._turn=this._turn==='w'?'b':'w'; const us=this.turnColor();
+    this.castling=undo.castling; this.ep=undo.ep; this.half=undo.half; this.moveno=undo.moveno; this.kings[this._turn]=undo.king;
+    let piece=this.board[m.to];
+    if(m.promotion){ piece=us*P; }
+    this.board[m.from]=piece; this.board[m.to]=0;
+    if(Math.abs(piece)===K){ this.kings[this._turn]=m.from; if(m.flags.includes('k')){ this.board[m.to+1]=us*R; this.board[m.to-1]=0; } if(m.flags.includes('q')){ this.board[m.to-2]=us*R; this.board[m.to+1]=0; } }
+    if(undo.capSq>=0) this.board[undo.capSq]=undo.captured;
+  }
+  _legalMoves(onlyFrom){
+    const pseudo=this._genPseudo(onlyFrom); const legal=[]; const us=this.turnColor();
+    for(const m of pseudo){ this._makeRaw(m); if(!this._isAttacked(this.kings[us===1?'w':'b'], -us)) legal.push(m); this._unmakeRaw(); }
+    return legal;
+  }
+  _decorate(m){ const piece=this.board[m.from]; const t=Math.abs(piece); const o={color:Math.sign(piece)===1?'w':'b', from:alg(m.from), to:alg(m.to), piece:SYM[t], flags:m.flags, _raw:m}; if(m.promotion)o.promotion=SYM[m.promotion]; let cap=0; if(m.flags.includes('e'))cap=P; else if(this.board[m.to]!==0)cap=Math.abs(this.board[m.to]); if(cap)o.captured=SYM[cap]; return o; }
+  moves(opts){ opts=opts||{}; const from = opts.square?sqFromAlg(opts.square):null; const legal=this._legalMoves(from);
+    if(opts.verbose){ return legal.map(m=>{ const d=this._decorate(m); d.san=this._san(m,legal); return d; }); }
+    return legal.map(m=>this._san(m,legal));
+  }
+  _san(m, legalList){
+    if(m.flags.includes('k'))return this._chk('O-O',m); if(m.flags.includes('q'))return this._chk('O-O-O',m);
+    const piece=Math.abs(this.board[m.from]); let s='';
+    if(piece===P){ if(m.flags.includes('c')||m.flags.includes('e')){ s=FILES[f_(m.from)]+'x'; } s+=alg(m.to); if(m.promotion)s+='='+SYM[m.promotion].toUpperCase(); }
+    else { s=SYM[piece].toUpperCase();
+      const others=(legalList||this._legalMoves(null)).filter(x=>x.to===m.to && x.from!==m.from && Math.abs(this.board[x.from])===piece);
+      if(others.length){ const sameFile=others.some(x=>f_(x.from)===f_(m.from)); const sameRank=others.some(x=>r_(x.from)===r_(m.from)); if(!sameFile)s+=FILES[f_(m.from)]; else if(!sameRank)s+=(r_(m.from)+1); else s+=alg(m.from); }
+      if(m.flags.includes('c'))s+='x'; s+=alg(m.to);
+    }
+    return this._chk(s,m);
+  }
+  _chk(s,m){ this._makeRaw(m); let suf=''; if(this.in_check()){ suf=this._legalMoves(null).length?'+':'#'; } this._unmakeRaw(); return s+suf; }
+  move(mv, opts){ opts=opts||{}; const legal=this._legalMoves(null);
+    let chosen=null;
+    if(typeof mv==='object'){ const from=mv.from, to=mv.to; const cands=legal.filter(m=>alg(m.from)===from&&alg(m.to)===to); if(mv.promotion){ chosen=cands.find(m=>SYM[m.promotion]===mv.promotion)||cands[0]; } else chosen=cands[0]; }
+    else { const clean=String(mv).replace(/[+#!?]+$/,''); const sanMap={}; for(const m of legal){ sanMap[this._san(m,legal).replace(/[+#]/g,'')]=m; }
+      chosen=sanMap[clean];
+      if(!chosen&&opts.sloppy){ const mm=clean.match(/^([a-h][1-8])([a-h][1-8])([qrbn])?$/i); if(mm){ chosen=legal.find(m=>alg(m.from)===mm[1]&&alg(m.to)===mm[2]&&(!mm[3]||SYM[m.promotion]===mm[3].toLowerCase())); } }
+    }
+    if(!chosen)return null; const dec=this._decorate(chosen); dec.san=this._san(chosen,legal); this._makeRaw(chosen); this._sans.push(dec.san); return dec;
+  }
+  undo(){ if(!this._hist.length)return null; this._unmakeRaw(); this._sans.pop(); }
+  in_checkmate(){ return this.in_check()&&this._legalMoves(null).length===0; }
+  in_stalemate(){ return !this.in_check()&&this._legalMoves(null).length===0; }
+  insufficient_material(){ let total=0; for(let sq=0;sq<128;sq++){ if(!onBoard(sq))continue; const pc=this.board[sq]; if(pc===0||Math.abs(pc)===K)continue; total++; if(Math.abs(pc)===P||Math.abs(pc)===R||Math.abs(pc)===Q)return false; } return total<=2; }
+  in_draw(){ return this.half>=100||this.in_stalemate()||this.insufficient_material(); }
+  game_over(){ return this.in_checkmate()||this.in_stalemate()||this.in_draw(); }
+  history(opts){ opts=opts||{}; if(opts.verbose){ const fenStart=this._startFen||'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      const tmp=new Chess(fenStart); const out=[]; for(const s of this._sans){ const d=tmp.move(s,{sloppy:true}); if(d)out.push(d);} return out; }
+    return this._sans.slice();
+  }
+  header(){ if(arguments.length>=2){ this.headers[arguments[0]]=arguments[1]; return; } if(arguments.length===1){ return this.headers[arguments[0]]; } return Object.assign({},this.headers); }
+  load_pgn(pgn, opts){ opts=opts||{}; this.headers={};
+    const hdrRe=/\[(\w+)\s+"([^"]*)"\]/g; let m; while((m=hdrRe.exec(pgn))){ this.headers[m[1]]=m[2]; }
+    let body=pgn.replace(/\[[^\]]*\]/g,' ');
+    body=body.replace(/\{[^}]*\}/g,' ').replace(/;[^\n]*/g,' ').replace(/\$\d+/g,' ');
+    body=body.replace(/\([^)]*\)/g,' ');
+    body=body.replace(/\d+\.(\.\.)?/g,' ').replace(/(1-0|0-1|1\/2-1\/2|\*)/g,' ');
+    const start=this.headers.FEN; if(start){ if(!this.load(start))return false; this._startFen=start; } else { this.load('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'); this._startFen=this.fen(); }
+    const tokens=body.split(/\s+/).filter(Boolean);
+    for(const tk of tokens){ const d=this.move(tk,{sloppy:true}); if(!d){ return false; } }
+    return true;
+  }
+  pgn(){ let s=''; for(const k in this.headers){ s+=`[${k} "${this.headers[k]}"]\n`; } s+='\n'; let n=1; for(let i=0;i<this._sans.length;i++){ if(i%2===0){ s+=(n)+'. '; n++; } s+=this._sans[i]+' '; } if(this.headers.Result)s+=this.headers.Result; return s.trim(); }
+}
+
+
+
+return Chess;
+})();
+</script>
+<!-- نص مكتبة المحرك للـ Web Worker (تحليل داخلي يعمل أوفلاين) -->
+<script type="text/plain" id="worker-lib">
+/* Self-contained 0x88 chess core (drop-in subset of chess.js API) */
+'use strict';
+const EMPTY=0, P=1,N=2,B=3,R=4,Q=5,K=6;
+const WK=1,WQ=2,BK=4,BQ=8;
+const KN_OFF=[-18,-33,-31,-14,18,33,31,14];
+const B_OFF=[-17,-15,17,15];
+const R_OFF=[-16,16,-1,1];
+const K_OFF=[-17,-16,-15,-1,1,15,16,17];
+const FILES=['a','b','c','d','e','f','g','h'];
+function f_(sq){return sq&7;} function r_(sq){return sq>>4;}
+function alg(sq){return FILES[f_(sq)]+(r_(sq)+1);}
+function sqFromAlg(s){return (parseInt(s[1])-1)*16 + FILES.indexOf(s[0]);}
+function onBoard(sq){return (sq&0x88)===0;}
+const SYM={1:'p',2:'n',3:'b',4:'r',5:'q',6:'k'};
+const FROMSYM={p:1,n:2,b:3,r:4,q:5,k:6};
+
+class Chess{
+  constructor(fen){ this.headers={}; this.reset(); if(fen){ this.load(fen);} else { this.load('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'); } }
+  reset(){ this.board=new Int8Array(128); this._turn='w'; this.castling=0; this.ep=-1; this.half=0; this.moveno=1; this.kings={w:-1,b:-1}; this._hist=[]; this._sans=[]; }
+  validate_fen(fen){
+    const parts=fen.trim().split(/\s+/); if(parts.length<4) return {valid:false,error:'حقول ناقصة'};
+    const rows=parts[0].split('/'); if(rows.length!==8) return {valid:false,error:'عدد الصفوف غير صحيح'};
+    for(const row of rows){ let c=0; for(const ch of row){ if(/\d/.test(ch))c+=+ch; else if(/[prnbqkPRNBQK]/.test(ch))c++; else return {valid:false,error:'حرف غير صالح'}; } if(c!==8) return {valid:false,error:'صف بطول خاطئ'}; }
+    if(!/^[wb]$/.test(parts[1])) return {valid:false,error:'دور غير صحيح'};
+    return {valid:true,error:null};
+  }
+  load(fen){
+    const v=this.validate_fen(fen); if(!v.valid) return false;
+    this.reset();
+    const parts=fen.trim().split(/\s+/); const rows=parts[0].split('/');
+    for(let r=0;r<8;r++){ let file=0; for(const ch of rows[r]){ if(/\d/.test(ch)){file+=+ch;} else { const color=ch===ch.toUpperCase()?1:-1; const t=FROMSYM[ch.toLowerCase()]; const sq=(7-r)*16+file; this.board[sq]=color*t; if(t===K){ this.kings[color===1?'w':'b']=sq; } file++; } } }
+    this._turn=parts[1];
+    if(parts[2]&&parts[2]!=='-'){ if(parts[2].includes('K'))this.castling|=WK; if(parts[2].includes('Q'))this.castling|=WQ; if(parts[2].includes('k'))this.castling|=BK; if(parts[2].includes('q'))this.castling|=BQ; }
+    this.ep = (parts[3]&&parts[3]!=='-')?sqFromAlg(parts[3]):-1;
+    this.half = parts[4]?parseInt(parts[4]):0; this.moveno=parts[5]?parseInt(parts[5]):1;
+    return true;
+  }
+  fen(){
+    let s=''; for(let r=7;r>=0;r--){ let empty=0; for(let f=0;f<8;f++){ const pc=this.board[r*16+f]; if(pc===0){empty++;} else { if(empty){s+=empty;empty=0;} let l=SYM[Math.abs(pc)]; s+= pc>0?l.toUpperCase():l; } } if(empty)s+=empty; if(r)s+='/'; }
+    let cr=''; if(this.castling&WK)cr+='K'; if(this.castling&WQ)cr+='Q'; if(this.castling&BK)cr+='k'; if(this.castling&BQ)cr+='q'; if(!cr)cr='-';
+    return s+' '+this._turn+' '+cr+' '+(this.ep>=0?alg(this.ep):'-')+' '+this.half+' '+this.moveno;
+  }
+  turnColor(){ return this._turn==='w'?1:-1; }
+  turn(){ return this._turn; }
+  _isAttacked(sq, bySign){
+    if(bySign===1){ if(onBoard(sq-17)&&this.board[sq-17]===P) return true; if(onBoard(sq-15)&&this.board[sq-15]===P) return true; }
+    else { if(onBoard(sq+17)&&this.board[sq+17]===-P) return true; if(onBoard(sq+15)&&this.board[sq+15]===-P) return true; }
+    for(const o of KN_OFF){ const t=sq+o; if(onBoard(t)&&this.board[t]===bySign*N) return true; }
+    for(const o of K_OFF){ const t=sq+o; if(onBoard(t)&&this.board[t]===bySign*K) return true; }
+    for(const o of B_OFF){ let t=sq+o; while(onBoard(t)){ const pc=this.board[t]; if(pc!==0){ if(pc===bySign*B||pc===bySign*Q) return true; break; } t+=o; } }
+    for(const o of R_OFF){ let t=sq+o; while(onBoard(t)){ const pc=this.board[t]; if(pc!==0){ if(pc===bySign*R||pc===bySign*Q) return true; break; } t+=o; } }
+    return false;
+  }
+  in_check(){ const us=this.turnColor(); const ks=this.kings[this._turn]; return this._isAttacked(ks, -us); }
+  _genPseudo(onlyFrom){
+    const us=this.turnColor(); const moves=[];
+    const add=(from,to,flags,promo)=>{ moves.push({from,to,flags,promotion:promo}); };
+    for(let sq=0;sq<128;sq++){ if(!onBoard(sq))continue; const pc=this.board[sq]; if(pc===0||Math.sign(pc)!==us)continue; if(onlyFrom!=null&&sq!==onlyFrom)continue; const t=Math.abs(pc);
+      if(t===P){ const dir=us===1?16:-16; const startRank=us===1?1:6; const promoRank=us===1?6:1;
+        const one=sq+dir; if(onBoard(one)&&this.board[one]===0){ if(r_(sq)===promoRank){ for(const pr of [Q,R,B,N]) add(sq,one,'np',pr);} else { add(sq,one,'n'); if(r_(sq)===startRank){ const two=sq+2*dir; if(this.board[two]===0) add(sq,two,'b'); } } }
+        for(const dc of [dir-1,dir+1]){ const tt=sq+dc; if(!onBoard(tt))continue; const cap=this.board[tt]; if(cap!==0&&Math.sign(cap)===-us){ if(r_(sq)===promoRank){ for(const pr of [Q,R,B,N]) add(sq,tt,'cp',pr);} else add(sq,tt,'c'); } else if(tt===this.ep){ add(sq,tt,'e'); } }
+      } else if(t===N){ for(const o of KN_OFF){ const tt=sq+o; if(!onBoard(tt))continue; const cap=this.board[tt]; if(cap===0)add(sq,tt,'n'); else if(Math.sign(cap)===-us)add(sq,tt,'c'); } }
+      else if(t===K){ for(const o of K_OFF){ const tt=sq+o; if(!onBoard(tt))continue; const cap=this.board[tt]; if(cap===0)add(sq,tt,'n'); else if(Math.sign(cap)===-us)add(sq,tt,'c'); }
+        if(us===1&&sq===4){ if((this.castling&WK)&&this.board[5]===0&&this.board[6]===0&&this.board[7]===R&&!this._isAttacked(4,-1)&&!this._isAttacked(5,-1)&&!this._isAttacked(6,-1)) add(4,6,'k'); if((this.castling&WQ)&&this.board[3]===0&&this.board[2]===0&&this.board[1]===0&&this.board[0]===R&&!this._isAttacked(4,-1)&&!this._isAttacked(3,-1)&&!this._isAttacked(2,-1)) add(4,2,'q'); }
+        if(us===-1&&sq===116){ if((this.castling&BK)&&this.board[117]===0&&this.board[118]===0&&this.board[119]===-R&&!this._isAttacked(116,1)&&!this._isAttacked(117,1)&&!this._isAttacked(118,1)) add(116,118,'k'); if((this.castling&BQ)&&this.board[115]===0&&this.board[114]===0&&this.board[113]===0&&this.board[112]===-R&&!this._isAttacked(116,1)&&!this._isAttacked(115,1)&&!this._isAttacked(114,1)) add(116,114,'q'); }
+      } else { const offs = t===B?B_OFF:t===R?R_OFF:K_OFF; for(const o of offs){ let tt=sq+o; while(onBoard(tt)){ const cap=this.board[tt]; if(cap===0)add(sq,tt,'n'); else { if(Math.sign(cap)===-us)add(sq,tt,'c'); break; } tt+=o; } } }
+    }
+    return moves;
+  }
+  _makeRaw(m){
+    const us=this.turnColor(); const piece=this.board[m.from]; const undo={m, captured:0, capSq:-1, castling:this.castling, ep:this.ep, half:this.half, moveno:this.moveno, king:this.kings[this._turn]};
+    this.ep=-1;
+    if(m.flags.includes('e')){ const capSq=m.to-(us===1?16:-16); undo.captured=this.board[capSq]; undo.capSq=capSq; this.board[capSq]=0; }
+    else if(this.board[m.to]!==0){ undo.captured=this.board[m.to]; undo.capSq=m.to; }
+    this.board[m.to]=piece; this.board[m.from]=0;
+    if(m.promotion){ this.board[m.to]=us*m.promotion; }
+    if(Math.abs(piece)===K){ this.kings[this._turn]=m.to; if(m.flags.includes('k')){ this.board[m.to-1]=us*R; this.board[m.to+1]=0; } if(m.flags.includes('q')){ this.board[m.to+1]=us*R; this.board[m.to-2]=0; } }
+    if(m.flags.includes('b')) this.ep=m.from+(us===1?16:-16);
+    if(piece===K){ this.castling&=~(WK|WQ);} if(piece===-K){ this.castling&=~(BK|BQ);}
+    if(m.from===0||m.to===0)this.castling&=~WQ; if(m.from===7||m.to===7)this.castling&=~WK; if(m.from===112||m.to===112)this.castling&=~BQ; if(m.from===119||m.to===119)this.castling&=~BK;
+    this.half = (Math.abs(piece)===P||undo.captured!==0)?0:this.half+1;
+    if(this._turn==='b')this.moveno++;
+    this._turn = this._turn==='w'?'b':'w';
+    this._hist.push(undo); return undo;
+  }
+  _unmakeRaw(){
+    const undo=this._hist.pop(); if(!undo)return; const m=undo.m;
+    this._turn=this._turn==='w'?'b':'w'; const us=this.turnColor();
+    this.castling=undo.castling; this.ep=undo.ep; this.half=undo.half; this.moveno=undo.moveno; this.kings[this._turn]=undo.king;
+    let piece=this.board[m.to];
+    if(m.promotion){ piece=us*P; }
+    this.board[m.from]=piece; this.board[m.to]=0;
+    if(Math.abs(piece)===K){ this.kings[this._turn]=m.from; if(m.flags.includes('k')){ this.board[m.to+1]=us*R; this.board[m.to-1]=0; } if(m.flags.includes('q')){ this.board[m.to-2]=us*R; this.board[m.to+1]=0; } }
+    if(undo.capSq>=0) this.board[undo.capSq]=undo.captured;
+  }
+  _legalMoves(onlyFrom){
+    const pseudo=this._genPseudo(onlyFrom); const legal=[]; const us=this.turnColor();
+    for(const m of pseudo){ this._makeRaw(m); if(!this._isAttacked(this.kings[us===1?'w':'b'], -us)) legal.push(m); this._unmakeRaw(); }
+    return legal;
+  }
+  _decorate(m){ const piece=this.board[m.from]; const t=Math.abs(piece); const o={color:Math.sign(piece)===1?'w':'b', from:alg(m.from), to:alg(m.to), piece:SYM[t], flags:m.flags, _raw:m}; if(m.promotion)o.promotion=SYM[m.promotion]; let cap=0; if(m.flags.includes('e'))cap=P; else if(this.board[m.to]!==0)cap=Math.abs(this.board[m.to]); if(cap)o.captured=SYM[cap]; return o; }
+  moves(opts){ opts=opts||{}; const from = opts.square?sqFromAlg(opts.square):null; const legal=this._legalMoves(from);
+    if(opts.verbose){ return legal.map(m=>{ const d=this._decorate(m); d.san=this._san(m,legal); return d; }); }
+    return legal.map(m=>this._san(m,legal));
+  }
+  _san(m, legalList){
+    if(m.flags.includes('k'))return this._chk('O-O',m); if(m.flags.includes('q'))return this._chk('O-O-O',m);
+    const piece=Math.abs(this.board[m.from]); let s='';
+    if(piece===P){ if(m.flags.includes('c')||m.flags.includes('e')){ s=FILES[f_(m.from)]+'x'; } s+=alg(m.to); if(m.promotion)s+='='+SYM[m.promotion].toUpperCase(); }
+    else { s=SYM[piece].toUpperCase();
+      const others=(legalList||this._legalMoves(null)).filter(x=>x.to===m.to && x.from!==m.from && Math.abs(this.board[x.from])===piece);
+      if(others.length){ const sameFile=others.some(x=>f_(x.from)===f_(m.from)); const sameRank=others.some(x=>r_(x.from)===r_(m.from)); if(!sameFile)s+=FILES[f_(m.from)]; else if(!sameRank)s+=(r_(m.from)+1); else s+=alg(m.from); }
+      if(m.flags.includes('c'))s+='x'; s+=alg(m.to);
+    }
+    return this._chk(s,m);
+  }
+  _chk(s,m){ this._makeRaw(m); let suf=''; if(this.in_check()){ suf=this._legalMoves(null).length?'+':'#'; } this._unmakeRaw(); return s+suf; }
+  move(mv, opts){ opts=opts||{}; const legal=this._legalMoves(null);
+    let chosen=null;
+    if(typeof mv==='object'){ const from=mv.from, to=mv.to; const cands=legal.filter(m=>alg(m.from)===from&&alg(m.to)===to); if(mv.promotion){ chosen=cands.find(m=>SYM[m.promotion]===mv.promotion)||cands[0]; } else chosen=cands[0]; }
+    else { const clean=String(mv).replace(/[+#!?]+$/,''); const sanMap={}; for(const m of legal){ sanMap[this._san(m,legal).replace(/[+#]/g,'')]=m; }
+      chosen=sanMap[clean];
+      if(!chosen&&opts.sloppy){ const mm=clean.match(/^([a-h][1-8])([a-h][1-8])([qrbn])?$/i); if(mm){ chosen=legal.find(m=>alg(m.from)===mm[1]&&alg(m.to)===mm[2]&&(!mm[3]||SYM[m.promotion]===mm[3].toLowerCase())); } }
+    }
+    if(!chosen)return null; const dec=this._decorate(chosen); dec.san=this._san(chosen,legal); this._makeRaw(chosen); this._sans.push(dec.san); return dec;
+  }
+  undo(){ if(!this._hist.length)return null; this._unmakeRaw(); this._sans.pop(); }
+  in_checkmate(){ return this.in_check()&&this._legalMoves(null).length===0; }
+  in_stalemate(){ return !this.in_check()&&this._legalMoves(null).length===0; }
+  insufficient_material(){ let total=0; for(let sq=0;sq<128;sq++){ if(!onBoard(sq))continue; const pc=this.board[sq]; if(pc===0||Math.abs(pc)===K)continue; total++; if(Math.abs(pc)===P||Math.abs(pc)===R||Math.abs(pc)===Q)return false; } return total<=2; }
+  in_draw(){ return this.half>=100||this.in_stalemate()||this.insufficient_material(); }
+  game_over(){ return this.in_checkmate()||this.in_stalemate()||this.in_draw(); }
+  history(opts){ opts=opts||{}; if(opts.verbose){ const fenStart=this._startFen||'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      const tmp=new Chess(fenStart); const out=[]; for(const s of this._sans){ const d=tmp.move(s,{sloppy:true}); if(d)out.push(d);} return out; }
+    return this._sans.slice();
+  }
+  header(){ if(arguments.length>=2){ this.headers[arguments[0]]=arguments[1]; return; } if(arguments.length===1){ return this.headers[arguments[0]]; } return Object.assign({},this.headers); }
+  load_pgn(pgn, opts){ opts=opts||{}; this.headers={};
+    const hdrRe=/\[(\w+)\s+"([^"]*)"\]/g; let m; while((m=hdrRe.exec(pgn))){ this.headers[m[1]]=m[2]; }
+    let body=pgn.replace(/\[[^\]]*\]/g,' ');
+    body=body.replace(/\{[^}]*\}/g,' ').replace(/;[^\n]*/g,' ').replace(/\$\d+/g,' ');
+    body=body.replace(/\([^)]*\)/g,' ');
+    body=body.replace(/\d+\.(\.\.)?/g,' ').replace(/(1-0|0-1|1\/2-1\/2|\*)/g,' ');
+    const start=this.headers.FEN; if(start){ if(!this.load(start))return false; this._startFen=start; } else { this.load('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'); this._startFen=this.fen(); }
+    const tokens=body.split(/\s+/).filter(Boolean);
+    for(const tk of tokens){ const d=this.move(tk,{sloppy:true}); if(!d){ return false; } }
+    return true;
+  }
+  pgn(){ let s=''; for(const k in this.headers){ s+=`[${k} "${this.headers[k]}"]\n`; } s+='\n'; let n=1; for(let i=0;i<this._sans.length;i++){ if(i%2===0){ s+=(n)+'. '; n++; } s+=this._sans[i]+' '; } if(this.headers.Result)s+=this.headers.Result; return s.trim(); }
+}
+
+
+
+/* ===== محرك بحث داخلي (Negamax + Alpha-Beta + Quiescence) ===== */
+const PVAL={1:100,2:320,3:330,4:500,5:900,6:0};
+const PST={
+ 1:[0,0,0,0,0,0,0,0, 50,50,50,50,50,50,50,50, 10,10,20,30,30,20,10,10, 5,5,10,25,25,10,5,5, 0,0,0,20,20,0,0,0, 5,-5,-10,0,0,-10,-5,5, 5,10,10,-20,-20,10,10,5, 0,0,0,0,0,0,0,0],
+ 2:[-50,-40,-30,-30,-30,-30,-40,-50, -40,-20,0,0,0,0,-20,-40, -30,0,10,15,15,10,0,-30, -30,5,15,20,20,15,5,-30, -30,0,15,20,20,15,0,-30, -30,5,10,15,15,10,5,-30, -40,-20,0,5,5,0,-20,-40, -50,-40,-30,-30,-30,-30,-40,-50],
+ 3:[-20,-10,-10,-10,-10,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,10,10,5,0,-10, -10,5,5,10,10,5,5,-10, -10,0,10,10,10,10,0,-10, -10,10,10,10,10,10,10,-10, -10,5,0,0,0,0,5,-10, -20,-10,-10,-10,-10,-10,-10,-20],
+ 4:[0,0,0,0,0,0,0,0, 5,10,10,10,10,10,10,5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, 0,0,0,5,5,0,0,0],
+ 5:[-20,-10,-10,-5,-5,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,5,5,5,0,-10, -5,0,5,5,5,5,0,-5, 0,0,5,5,5,5,0,-5, -10,5,5,5,5,5,0,-10, -10,0,5,0,0,0,0,-10, -20,-10,-10,-5,-5,-10,-10,-20],
+ 6:[-30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -20,-30,-30,-40,-40,-30,-30,-20, -10,-20,-20,-20,-20,-20,-20,-10, 20,20,0,0,0,0,20,20, 20,30,10,0,0,10,30,20],
+};
+const MATE=100000, INF=1000000;
+function evaluate(ch){
+  let sc=0;
+  for(let sq=0;sq<128;sq++){ if(!onBoard(sq))continue; const pc=ch.board[sq]; if(pc===0)continue; const t=Math.abs(pc); const rk=r_(sq),fl=f_(sq);
+    if(pc>0){ sc += PVAL[t] + PST[t][(7-rk)*8+fl]; } else { sc -= PVAL[t] + PST[t][rk*8+fl]; } }
+  return sc;
+}
+function evalNega(ch){ const s=evaluate(ch); return ch.turn()==='w'?s:-s; }
+function mvvlva(ch,m){ if(m.flags.includes('c')){ const victim=Math.abs(ch.board[m.to])||1; const att=Math.abs(ch.board[m.from]); return 1000+victim*10-att; } if(m.flags.includes('e'))return 1005; if(m.promotion)return 900; return 0; }
+function order(ch,moves){ return moves.map(m=>[mvvlva(ch,m),m]).sort((a,b)=>b[0]-a[0]).map(x=>x[1]); }
+function quiesce(ch,alpha,beta,qd){
+  let stand=evalNega(ch); if(stand>=beta)return beta; if(stand>alpha)alpha=stand; if(qd<=0)return alpha;
+  const caps=order(ch, ch._legalMoves(null).filter(m=>m.flags.includes('c')||m.flags.includes('e')||m.promotion));
+  for(const m of caps){ ch._makeRaw(m); const sc=-quiesce(ch,-beta,-alpha,qd-1); ch._unmakeRaw(); if(sc>=beta)return beta; if(sc>alpha)alpha=sc; }
+  return alpha;
+}
+function negamax(ch,depth,alpha,beta,ply){
+  if(depth<=0) return quiesce(ch,alpha,beta,10);
+  const moves=order(ch, ch._legalMoves(null));
+  if(moves.length===0){ return ch.in_check()? -(MATE-ply) : 0; }
+  let best=-INF;
+  for(const m of moves){ ch._makeRaw(m); const sc=-negamax(ch,depth-1,-beta,-alpha,ply+1); ch._unmakeRaw(); if(sc>best)best=sc; if(best>alpha)alpha=best; if(alpha>=beta)break; }
+  return best;
+}
+function engUci(m){ return alg(m.from)+alg(m.to)+(m.promotion?SYM[m.promotion]:''); }
+
+
+/* ===== جسر العامل (Web Worker) ===== */
+onmessage=function(e){
+  const d=e.data; const id=d.id; const ch=new Chess(d.fen);
+  if(d.evalOnly){
+    // تقييم وضعية واحدة (قيمة من منظور صاحب الدور) — أسرع من تقييم كل النقلات
+    let cp; if(ch.in_checkmate()) cp=-MATE; else if(ch.game_over()) cp=0; else cp=negamax(ch, d.depth, -INF, INF, 0);
+    postMessage({type:'result', id, cp}); return;
+  }
+  const moves=order(ch, ch._legalMoves(null)); const total=moves.length||1; const res=[];
+  for(let i=0;i<moves.length;i++){ const m=moves[i]; ch._makeRaw(m); const sc=-negamax(ch,d.depth-1,-INF,INF,1); ch._unmakeRaw(); res.push({m,score:sc}); postMessage({type:'progress',id,frac:(i+1)/total}); }
+  res.sort((a,b)=>b.score-a.score);
+  const lines=res.map(x=>({move:engUci(x.m), cp:x.score, pv:[engUci(x.m)]}));
+  postMessage({type:'result',id, lines, bestmove: lines.length?lines[0].move:null});
+};
+
+</script>
+
+<script>
+"use strict";
+/* =====================================================================
+   1) أدوات عامة + i18n + الثيم + التنقّل
+   ===================================================================== */
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+/* قطع الشطرنج كرموز يونيكود (تعمل أوفلاين بالكامل، بلا صور خارجية) */
+const GLYPH = {k:'\u265A',q:'\u265B',r:'\u265C',b:'\u265D',n:'\u265E',p:'\u265F'};
+
+const FILES = ['a','b','c','d','e','f','g','h'];
+const PIECE_VALUE = {p:100,n:300,b:330,r:500,q:900,k:20000};
+
+/* ---------- الترجمة (عربي/إنجليزي) ---------- */
+const I18N = {
+  ar:{
+    appTitle:"محلل الشطرنج",appSub:"Stockfish محلي — بدون إنترنت",
+    t1_title:"تحليل مباراة",t1_hint:"الصق رابط مباراة من Lichess (يُجلب تلقائياً) أو رابط Chess.com، أو الصق نص الـ PGN مباشرة. ثم اضغط تحليل.",
+    t1_url:"رابط المباراة (Lichess / Chess.com)",t1_fetch:"جلب الـPGN",t1_depth:"مستوى التحليل (1 سريع … 5 أعمق):",t1_analyze:"تحليل المباراة",stop:"إيقاف",
+    summary:"ملخص التحليل",white:"الأبيض",black:"الأسود",accuracy:"الدقة",
+    approxNote:"⚠️ التصنيفات (خصوصاً Brilliant وGreat) تقريبية ومبنية على منطق حسابي فوق تقييمات المحرك الداخلي، وقد تختلف عن نظام chess.com الرسمي غير المعلن.",
+    t2_title:"الباحث عن النقلة العبقرية",t2_hint:"رتّب القطع بحرية (اسحب وأفلِت)، اختر دور اللعب، ثم اضغط «بحث» ليُظهر فقط Brilliant (‼) أو Great (!).",
+    whiteToMove:"دور الأبيض",blackToMove:"دور الأسود",startPos:"الوضع الابتدائي",clearBoard:"تفريغ الرقعة",flipBoard:"⟲ قلب الرقعة",
+    t2_depth:"مستوى البحث (1 سريع … 5 أعمق):",t2_find:"ابحث عن النقلات الرائعة",
+    approxNote2:"⚠️ نُقيّم كل نقلة ممكنة بالمحرك (Stockfish المحلي أو المحرك الداخلي). أفضل نقلة = أعلى تقييم. Brilliant = تضحية مادية سليمة (الخصم يقدر يأخذها لكنها لا تُسترد) تبقى ضمن الأفضل ولا تخسر الأفضلية ولست رابحاً ساحقاً. Great = النقلة الأفضل الوحيدة عملياً (فارق كبير عن البديل). تقريبي وقد يختلف عن chess.com.",
+    ext_title:"رأي محرك خارجي + مراجعة محرّكك",ext_hint:"يجلب أفضل نقلة من محرك Stockfish خارجي (REST API) للوضع الحالي، ثم يراجعها محرّكك المحلي ويصنّفها ويقارن. (يحتاج إنترنت لجلب الرأي الخارجي فقط.)",ext_get:"أفضل نقلة (محرك خارجي) + مراجعة",ext_note:"ℹ️ موقع chessigma لا يوفّر API (يشغّل Stockfish داخل المتصفح فقط)، لذا نستخدم محرك Stockfish سحابياً مجانياً (stockfish.online ومع بديل chess-api.com).",ext_play:"العب هذه النقلة",
+    t3_title:"لغز اليوم التكتيكي",t3_hint:"لغز يومي من Lichess. جِد أفضل نقلة ونفّذها على الرقعة.",t3_load:"تحميل لغز اليوم",
+    t4_title:"سجل التحليلات",t4_hint:"تُحفظ تحليلاتك محلياً في متصفحك. اضغط على أي عنصر لإعادة تحميله.",
+    t5_title:"تخصيص المظهر",t5_hint:"غيّر ألوان الموقع ولون الرقعة. تُحفظ تلقائياً.",
+    c_primary:"الأساسي",c_primary2:"الأساسي الفاتح",c_accent:"التمييز",c_bg:"الخلفية",c_surface:"البطاقات",c_blight:"الرقعة فاتح",c_bdark:"الرقعة غامق",
+    language:"اللغة",resetTheme:"إعادة الضبط الافتراضي",about:"حول",
+    aboutText:"ملف HTML واحد يعمل في المتصفح. يستخدم محرك Stockfish المحلي (stockfish.js/stockfish.wasm) الموجود بجانب الملف لأقصى قوة، ويملك محركاً داخلياً مدمجاً كبديل. لا يحتاج إنترنت للتحليل.",
+    engineNote:"يُحمَّل Stockfish من ملفّيه المحلّيين بجانب index.html (بدون إنترنت/CDN). إن لم يتوفّرا يعمل المحرك الداخلي المدمج. الإنترنت مطلوب فقط لجلب مباريات Lichess/Chess.com ولغز اليوم.",
+    tab1:"تحليل",tab2:"العبقرية",tab3:"لغز",tab4:"السجل",tab5:"إعدادات",
+    Brilliant:"عبقرية",Great:"رائعة",Best:"الأفضل",Excellent:"ممتازة",Good:"جيدة",Book:"افتتاحية",Inaccuracy:"عدم دقة",Mistake:"خطأ",Blunder:"خطأ فادح",
+    moves:"نقلات",blunders:"أخطاء فادحة",
+  },
+  en:{
+    appTitle:"Chess Analyzer",appSub:"Local Stockfish — no internet",
+    t1_title:"Analyze a Game",t1_hint:"Paste a Lichess game URL (auto-fetched) or a Chess.com URL, or paste PGN directly. Then press Analyze.",
+    t1_url:"Game URL (Lichess / Chess.com)",t1_fetch:"Fetch PGN",t1_depth:"Analysis level (1 fast … 5 deepest):",t1_analyze:"Analyze Game",stop:"Stop",
+    summary:"Analysis Summary",white:"White",black:"Black",accuracy:"Accuracy",
+    approxNote:"⚠️ Classifications (especially Brilliant & Great) are approximate heuristics over the built-in engine's evaluations and may differ from Chess.com's undisclosed system.",
+    t2_title:"Brilliant Move Finder",t2_hint:"Arrange pieces freely (drag & drop), pick side to move, then press Find to show only Brilliant (‼) or Great (!) moves.",
+    whiteToMove:"White to move",blackToMove:"Black to move",startPos:"Start position",clearBoard:"Clear board",flipBoard:"⟲ Flip board",
+    t2_depth:"Search level (1 fast … 5 deepest):",t2_find:"Find brilliant moves",
+    approxNote2:"⚠️ Every legal move is evaluated by the engine (local Stockfish or built-in). Best = highest eval. Brilliant = a sound material sacrifice (the opponent can take it but can't profit) that stays among the best and keeps the advantage while not already crushing. Great = the practically only best move (big gap to the alternative). Approximate; may differ from chess.com.",
+    ext_title:"External engine opinion + your review",ext_hint:"Fetches the best move from an external Stockfish engine (REST API) for the current position, then your local engine reviews and classifies it and compares. (Needs internet only for the external opinion.)",ext_get:"Best move (external engine) + review",ext_note:"ℹ️ chessigma has no API (it runs Stockfish in the browser only), so we use a free cloud Stockfish (stockfish.online with chess-api.com fallback).",ext_play:"Play this move",
+    t3_title:"Daily Tactics Puzzle",t3_hint:"Daily puzzle from Lichess. Find the best move and play it on the board.",t3_load:"Load today's puzzle",
+    t4_title:"Analysis History",t4_hint:"Your analyses are saved locally in your browser. Tap any item to reload.",
+    t5_title:"Customize Appearance",t5_hint:"Change site colors and board colors. Saved automatically.",
+    c_primary:"Primary",c_primary2:"Primary light",c_accent:"Accent",c_bg:"Background",c_surface:"Cards",c_blight:"Board light",c_bdark:"Board dark",
+    language:"Language",resetTheme:"Reset to default",about:"About",
+    aboutText:"A single HTML file running in the browser. It uses the local Stockfish (stockfish.js/stockfish.wasm) placed next to the file for maximum strength, with a built-in engine as fallback. No internet needed for analysis.",
+    engineNote:"Stockfish loads from its two local files next to index.html (no internet/CDN). If they are missing, the built-in engine is used. Internet is only needed to fetch Lichess/Chess.com games and the daily puzzle.",
+    tab1:"Analyze",tab2:"Brilliant",tab3:"Puzzle",tab4:"History",tab5:"Settings",
+    Brilliant:"Brilliant",Great:"Great",Best:"Best",Excellent:"Excellent",Good:"Good",Book:"Book",Inaccuracy:"Inaccuracy",Mistake:"Mistake",Blunder:"Blunder",
+    moves:"moves",blunders:"blunders",
+  }
+};
+let LANG = localStorage.getItem('ca_lang') || 'ar';
+function applyLang(lang){
+  LANG = lang; localStorage.setItem('ca_lang',lang);
+  const dict = I18N[lang];
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang==='ar' ? 'rtl' : 'ltr';
+  $$('[data-i18n]').forEach(el=>{ const k=el.getAttribute('data-i18n'); if(dict[k]!=null) el.textContent = dict[k]; });
+  $('#langBtn').textContent = lang==='ar' ? 'EN' : 'ع';
+  $$('#langSeg button').forEach(b=>b.classList.toggle('active', b.dataset.lang===lang));
+}
+const T = k => (I18N[LANG][k] ?? k);
+
+/* ---------- الثيم ---------- */
+const THEME_VARS = ['--primary','--primary-2','--accent','--bg','--surface','--board-light','--board-dark'];
+const DEFAULT_THEME = {'--primary':'#3a9d7a','--primary-2':'#46c39a','--accent':'#f0a830','--bg':'#161b22','--surface':'#242c38','--board-light':'#e9d8b5','--board-dark':'#9c7a4e'};
+const PRESETS = {
+  "أخضر | Green":DEFAULT_THEME,
+  "أزرق | Blue":{'--primary':'#3a7bd5','--primary-2':'#4aa3f0','--accent':'#f0b429','--bg':'#0f1623','--surface':'#1b2433','--board-light':'#dfe7ef','--board-dark':'#6f87a8'},
+  "بنفسجي | Purple":{'--primary':'#7c4dff','--primary-2':'#9a78ff','--accent':'#ff9e3d','--bg':'#15101f','--surface':'#241b33','--board-light':'#ece3f5','--board-dark':'#8a6fb0'},
+  "ليلي | Midnight":{'--primary':'#e74c3c','--primary-2':'#ff7062','--accent':'#f0c419','--bg':'#0d0d10','--surface':'#1a1a20','--board-light':'#c9c9d4','--board-dark':'#52525e'},
+  "كلاسيكي | Wood":{'--primary':'#8d6e3a','--primary-2':'#b08d57','--accent':'#d98c2b','--bg':'#1c1813','--surface':'#2a241b','--board-light':'#f0d9b5','--board-dark':'#b58863'},
+};
+function loadTheme(){
+  let saved={}; try{ saved=JSON.parse(localStorage.getItem('ca_theme')||'{}'); }catch(e){}
+  const theme = Object.assign({}, DEFAULT_THEME, saved);
+  THEME_VARS.forEach(v=>document.documentElement.style.setProperty(v, theme[v]));
+  THEME_VARS.forEach(v=>{ const inp=$(`input[data-var="${v}"]`); if(inp) inp.value=theme[v]; });
+  // إعادة رسم الرقع لتطبيق ألوان جديدة
+  setTimeout(()=>{ [board1,board2,board3].forEach(b=>b&&b.applyColors&&b.applyColors()); },0);
+}
+function saveTheme(){
+  const t={}; THEME_VARS.forEach(v=>t[v]=getComputedStyle(document.documentElement).getPropertyValue(v).trim());
+  localStorage.setItem('ca_theme',JSON.stringify(t));
+}
+function setThemeVar(v,val){ document.documentElement.style.setProperty(v,val); saveTheme(); }
+
+/* ---------- التوست ---------- */
+let toastTimer;
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2800); }
+
+/* ---------- التنقل بين الأقسام ---------- */
+function switchView(id){
+  $$('.view').forEach(v=>v.classList.toggle('active', v.id===id));
+  $$('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.view===id));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+</script>
+
+<script>
+/* =====================================================================
+   2) مكوّن الرقعة القابل لإعادة الاستخدام (عرض / تحرير / لعب)
+   - يدعم السحب والإفلات باللمس (pointer events) للهواتف.
+   - حركات انتقالية ناعمة عند تنفيذ النقلات.
+   ===================================================================== */
+class Board{
+  constructor(el, opts={}){
+    this.el = el;
+    this.orientation = opts.orientation || 'w';
+    this.mode = opts.mode || 'view';            // 'view' | 'edit' | 'play'
+    this.onChange = opts.onChange || null;       // تُستدعى عند تغيير الوضع (edit)
+    this.onMove = opts.onMove || null;           // تُستدعى عند نقلة لاعب (play)
+    this.position = {};                          // square -> {color,type}
+    this.nodes = {};                             // square -> piece element
+    this.squares = {};                           // square -> square element
+    this.dragPiece = null;                       // {color,type} عند السحب من اللوحة
+    this._build();
+    this._bindPointer();
+  }
+  _build(){
+    this.el.innerHTML='';
+    // إنشاء 64 مربعاً
+    for(let f=0;f<8;f++) for(let r=0;r<8;r++){
+      const sq = FILES[f]+(r+1);
+      const d = document.createElement('div');
+      d.className = 'sq ' + (((f+r)%2===0)?'dark':'light');
+      d.dataset.square = sq;
+      this.el.appendChild(d);
+      this.squares[sq] = d;
+    }
+    this.layerHL = []; // عناصر الإبراز
+    this._positionSquares();
+    this._updateFont();
+    if(window.ResizeObserver){ this._ro=new ResizeObserver(()=>this._updateFont()); this._ro.observe(this.el); }
+  }
+  _updateFont(){ const w=this.el.clientWidth; if(w>0) this.el.style.fontSize=(w/8)+'px'; }
+  applyColors(){ /* الألوان تأتي من متغيرات CSS تلقائياً، لا حاجة لإعادة بناء */ }
+  setOrientation(o){ this.orientation=o; this._positionSquares(); this._repositionAll(); }
+  flip(){ this.setOrientation(this.orientation==='w'?'b':'w'); }
+
+  _screen(sq){ // إرجاع {col,row} على الشاشة حسب الاتجاه
+    const f = FILES.indexOf(sq[0]); const r = parseInt(sq[1])-1;
+    if(this.orientation==='w') return {col:f, row:7-r};
+    return {col:7-f, row:r};
+  }
+  _positionSquares(){
+    for(const sq in this.squares){
+      const {col,row}=this._screen(sq); const e=this.squares[sq];
+      e.style.left=(col*12.5)+'%'; e.style.top=(row*12.5)+'%';
+      e.querySelectorAll('.coord').forEach(c=>c.remove());
+      // إحداثيات على الحافة (آخر صف + أول عمود على الشاشة)
+      if(row===7){ const c=document.createElement('span'); c.className='coord file'; c.textContent=sq[0]; e.appendChild(c);}
+      if(col===0){ const c=document.createElement('span'); c.className='coord rank'; c.textContent=sq[1]; e.appendChild(c);}
+    }
+  }
+  _xyOf(sq){ const {col,row}=this._screen(sq); return {left:col*12.5, top:row*12.5}; }
+
+  _makePiece(color,type){
+    const p=document.createElement('div'); p.className='piece '+color;
+    p.textContent=GLYPH[type];
+    p.dataset.color=color; p.dataset.type=type;
+    return p;
+  }
+  _placeNode(sq,color,type){
+    const p=this._makePiece(color,type); const {left,top}=this._xyOf(sq);
+    p.style.left=left+'%'; p.style.top=top+'%'; this.el.appendChild(p);
+    this.nodes[sq]=p; return p;
+  }
+  _repositionAll(){ for(const sq in this.nodes){ const {left,top}=this._xyOf(sq); const n=this.nodes[sq]; n.style.left=left+'%'; n.style.top=top+'%'; } }
+
+  clear(){ for(const sq in this.nodes){ this.nodes[sq].remove(); } this.nodes={}; this.position={}; }
+
+  /* تعيين الوضع من خريطة square->{color,type} */
+  setPosition(map){ this.clear(); for(const sq in map){ const pc=map[sq]; this.position[sq]={color:pc.color,type:pc.type}; this._placeNode(sq,pc.color,pc.type); } }
+
+  /* تحميل من FEN (الجزء الأول كافٍ للقطع) */
+  setFEN(fen){
+    const map={}; const rows=fen.split(' ')[0].split('/');
+    for(let r=0;r<8;r++){ let f=0; for(const ch of rows[r]){ if(/\d/.test(ch)){ f+=parseInt(ch);} else { const color = ch===ch.toUpperCase()?'w':'b'; const type=ch.toLowerCase(); const sq=FILES[f]+(8-r); map[sq]={color,type}; f++; } } }
+    this.setPosition(map);
+  }
+  /* بناء FEN كامل من الوضع الحالي (للمحرّر) */
+  toFEN(turn='w'){
+    let rows=[];
+    for(let r=8;r>=1;r--){ let row=''; let empty=0; for(let f=0;f<8;f++){ const sq=FILES[f]+r; const pc=this.position[sq]; if(pc){ if(empty){row+=empty;empty=0;} let l=pc.type; row+= pc.color==='w'?l.toUpperCase():l; } else empty++; } if(empty)row+=empty; rows.push(row); }
+    // حقوق التبييت: نحاول استنتاجها (إن كان الملك والطابية في مكانهما)
+    let cr='';
+    if(this.position['e1']&&this.position['e1'].type==='k'&&this.position['e1'].color==='w'){ if(this.position['h1']&&this.position['h1'].type==='r')cr+='K'; if(this.position['a1']&&this.position['a1'].type==='r')cr+='Q'; }
+    if(this.position['e8']&&this.position['e8'].type==='k'&&this.position['e8'].color==='b'){ if(this.position['h8']&&this.position['h8'].type==='r')cr+='k'; if(this.position['a8']&&this.position['a8'].type==='r')cr+='q'; }
+    if(!cr)cr='-';
+    return rows.join('/')+' '+turn+' '+cr+' - 0 1';
+  }
+
+  /* تحريك قطعة بانتقال ناعم (للعارض) — m كائن chess.js verbose */
+  animateMove(m){
+    const fromNode=this.nodes[m.from];
+    // أكل عابر
+    if(m.flags && m.flags.includes('e')){ const capSq=m.to[0]+m.from[1]; if(this.nodes[capSq]){this.nodes[capSq].remove(); delete this.nodes[capSq];} }
+    // أكل عادي
+    if(this.nodes[m.to]){ this.nodes[m.to].remove(); delete this.nodes[m.to]; }
+    if(fromNode){
+      const {left,top}=this._xyOf(m.to); fromNode.style.left=left+'%'; fromNode.style.top=top+'%';
+      delete this.nodes[m.from]; this.nodes[m.to]=fromNode;
+      // ترقية
+      if(m.promotion){ fromNode.textContent=GLYPH[m.promotion]; fromNode.dataset.type=m.promotion; }
+    }
+    // التبييت: تحريك الطابية
+    if(m.flags && (m.flags.includes('k')||m.flags.includes('q'))){
+      const rank=m.color==='w'?'1':'8';
+      const rookFrom = m.flags.includes('k')?('h'+rank):('a'+rank);
+      const rookTo   = m.flags.includes('k')?('f'+rank):('d'+rank);
+      const rn=this.nodes[rookFrom]; if(rn){ const {left,top}=this._xyOf(rookTo); rn.style.left=left+'%'; rn.style.top=top+'%'; delete this.nodes[rookFrom]; this.nodes[rookTo]=rn; }
+    }
+    // مزامنة position (تقريبية، العارض يعتمد على FEN عند القفز)
+  }
+
+  /* إبراز نقلة (from/to) + شارة تصنيف اختيارية */
+  highlight(from,to,badge){
+    this.clearHighlights();
+    [['hl-from',from],['hl-to',to]].forEach(([cls,sq])=>{ if(!sq)return; const d=document.createElement('div'); d.className=cls; const {left,top}=this._xyOf(sq); d.style.left=left+'%'; d.style.top=top+'%'; this.el.appendChild(d); this.layerHL.push(d); });
+    if(badge && to){ const b=document.createElement('div'); b.className='badge'; b.style.background=badge.color; b.textContent=badge.sym; const {left,top}=this._xyOf(to); b.style.left=`calc(${left}% + 9.5%)`; b.style.top=top+'%'; this.el.appendChild(b); this.layerHL.push(b); }
+  }
+  clearHighlights(){ this.layerHL.forEach(e=>e.remove()); this.layerHL=[]; this._clearHints(); }
+  _clearHints(){ this.el.querySelectorAll('.hint-dot').forEach(e=>e.remove()); }
+  showHints(squares){ this._clearHints(); squares.forEach(s=>{ const d=document.createElement('div'); d.className='hint-dot'+(this.position[s.to]?' cap':''); const {left,top}=this._xyOf(s.to); d.style.left=left+'%'; d.style.top=top+'%'; this.el.appendChild(d); }); }
+
+  /* ====================== السحب والإفلات ====================== */
+  _pointSquare(cx,cy){
+    const rect=this.el.getBoundingClientRect(); const x=cx-rect.left, y=cy-rect.top;
+    const cell=rect.width/8; if(x<-cell||y<-cell||x>rect.width+cell||y>rect.height+cell) return null;
+    let col=Math.floor(x/cell), row=Math.floor(y/cell); col=Math.max(0,Math.min(7,col)); row=Math.max(0,Math.min(7,row));
+    let f,r; if(this.orientation==='w'){f=col;r=7-row;}else{f=7-col;r=row;} return FILES[f]+(r+1);
+  }
+  setDragPiece(color,type){ this.dragPiece = (color&&type)?{color,type}:null; }
+  _bindPointer(){
+    if(this.mode==='view') return;
+    let drag=null;
+    const down=(e)=>{
+      const target=e.target;
+      const cx=e.clientX, cy=e.clientY;
+      // وضع المسح: إزالة القطعة من المربع الملموس
+      if(this.mode==='edit' && this.eraseMode){
+        const sq=this._pointSquare(cx,cy); if(sq){ this._removeSquare(sq); this._emitChange(); } return;
+      }
+      // وضع قطعة جديدة من اللوحة
+      if(this.mode==='edit' && this.dragPiece){
+        const sq=this._pointSquare(cx,cy); if(!sq)return;
+        this._setSquare(sq,this.dragPiece.color,this.dragPiece.type); this._emitChange(); return;
+      }
+      if(!target.classList.contains('piece')) return;
+      e.preventDefault();
+      const fromSq = this._squareOfNode(target); if(!fromSq) return;
+      // في وضع اللعب: أظهِر النقلات الممكنة
+      if(this.mode==='play' && this.onHints){ this.showHints(this.onHints(fromSq)); }
+      drag={node:target,from:fromSq,moved:false};
+      target.classList.add('dragging');
+      const rect=this.el.getBoundingClientRect(); this._dragRect=rect; this._cell=rect.width/8;
+      moveTo(cx,cy);
+    };
+    const moveTo=(cx,cy)=>{
+      if(!drag)return; const rect=this._dragRect; const half=this._cell/2;
+      let x=cx-rect.left-half, y=cy-rect.top-half;
+      drag.node.style.left=(x/rect.width*100)+'%'; drag.node.style.top=(y/rect.height*100)+'%';
+      drag.moved=true;
+    };
+    const move=(e)=>{ if(!drag)return; e.preventDefault(); moveTo(e.clientX,e.clientY); };
+    const up=(e)=>{
+      if(!drag)return; const node=drag.node; node.classList.remove('dragging');
+      const sq=this._pointSquare(e.clientX,e.clientY); const from=drag.from;
+      this._clearHints();
+      if(!sq){ // خارج الرقعة
+        if(this.mode==='edit'){ this._removeSquare(from); this._emitChange(); }
+        else { this._snap(node,from); }
+        drag=null; return;
+      }
+      if(sq===from){ this._snap(node,from); drag=null; return; }
+      if(this.mode==='edit'){
+        const pc=this.position[from]; this._removeSquare(from); this._setSquare(sq,pc.color,pc.type); this._emitChange();
+      } else if(this.mode==='play'){
+        const ok = this.onMove ? this.onMove(from,sq) : false;
+        if(!ok){ this._snap(node,from); } // النقلة غير قانونية → رجوع
+      }
+      drag=null;
+    };
+    this.el.addEventListener('pointerdown',down,{passive:false});
+    window.addEventListener('pointermove',move,{passive:false});
+    window.addEventListener('pointerup',up);
+    window.addEventListener('pointercancel',up);
+  }
+  _snap(node,sq){ const {left,top}=this._xyOf(sq); node.style.left=left+'%'; node.style.top=top+'%'; }
+  _squareOfNode(node){ for(const sq in this.nodes){ if(this.nodes[sq]===node) return sq; } return null; }
+  _setSquare(sq,color,type){ if(this.nodes[sq]){this.nodes[sq].remove(); delete this.nodes[sq];} this.position[sq]={color,type}; this._placeNode(sq,color,type); }
+  _removeSquare(sq){ if(this.nodes[sq]){this.nodes[sq].remove(); delete this.nodes[sq];} delete this.position[sq]; }
+  _emitChange(){ if(this.onChange) this.onChange(); }
+}
+let board1=null, board2=null, board3=null;
+</script>
+
+<script>
+/* =====================================================================
+   3) المحرك: Stockfish محلي (نفس المجلد) + محرك داخلي احتياطي
+   - يُحاول أولاً تشغيل ملفّي stockfish.js/stockfish.wasm المرفوعين بجانب
+     index.html (بدون إنترنت/CDN، يعملان عبر GitHub Pages أو أي خادم ساكن).
+   - إن تعذّر، يستخدم المحرك الداخلي المدمج (يعمل حتى من ملف محلي file://).
+   - الواجهة موحّدة: analyzeGame / analyzeFind تُرجعان {bestmove, lines:[{move,cp,mate,pv}]}.
+   ===================================================================== */
+function scoreToCp(o){ // التقييم بالسنتيبون (نسبةً لمن عليه الدور)؛ المات يُمثَّل برقم كبير
+  if(o.mate!=null){ return (o.mate>0?1:-1)*(1000000 - Math.abs(o.mate)*1000); }
+  return o.cp;
+}
+const SF_PATHS=['stockfish.js','./stockfish.js','stockfish/stockfish.js'];
+class Engine{
+  constructor(){ this.mode=null; this.modeName=''; this.sf=null; this.jsW=null; this._sfHandler=null; this._cbs={}; this._id=0; this._queue=Promise.resolve(); this._inited=false; }
+
+  /* ---- بدء Stockfish المحلي ---- */
+  _startSF(path){
+    return new Promise((resolve,reject)=>{
+      let w; try{ w=new Worker(path); }catch(e){ return reject(e); }
+      let done=false; const to=setTimeout(()=>{ if(!done){done=true; try{w.terminate();}catch(e){} reject(new Error('timeout')); } }, 9000);
+      w.onmessage=(ev)=>{ const l=typeof ev.data==='string'?ev.data:(ev.data&&ev.data.data)||'';
+        if(l.indexOf('uciok')>=0){ w.postMessage('isready'); }
+        else if(l.indexOf('readyok')>=0){ if(!done){ done=true; clearTimeout(to); this.sf=w; resolve(); } } };
+      w.onerror=(e)=>{ if(!done){ done=true; clearTimeout(to); reject(new Error('sf error: '+(e.message||''))); } };
+      setTimeout(()=>{ try{ w.postMessage('uci'); }catch(e){} },30);
+    });
+  }
+  _attachSF(){
+    this.sf.onmessage=(ev)=>{ const l=typeof ev.data==='string'?ev.data:(ev.data&&ev.data.data)||''; if(this._sfHandler) this._sfHandler(l); };
+    try{ this.sf.postMessage('setoption name Threads value '+Math.max(1,(navigator.hardwareConcurrency||2)-1)); this.sf.postMessage('setoption name Hash value 64'); }catch(e){}
+  }
+  /* ---- المحرك الداخلي ---- */
+  _ensureJS(){
+    if(this.jsW) return;
+    const src=document.getElementById('worker-lib').textContent;
+    this.jsW=new Worker(URL.createObjectURL(new Blob([src],{type:'application/javascript'})));
+    this.jsW.onmessage=(e)=>{ const d=e.data; const cb=this._cbs[d.id]; if(!cb)return; if(d.type==='progress'){ cb.onProgress&&cb.onProgress(d.frac); } else if(d.type==='result'){ cb.resolve(d); delete this._cbs[d.id]; } };
+    this.jsW.onerror=(e)=>console.error('JS engine error',e.message);
+  }
+
+  async init(onStatus){
+    if(this._inited) return;
+    for(const p of SF_PATHS){ try{ await this._startSF(p); this.mode='sf'; this._attachSF(); this.modeName='Stockfish (محلي)'; break; }catch(e){ try{this.sf&&this.sf.terminate();}catch(_){ } this.sf=null; } }
+    if(this.mode!=='sf'){ this.mode='js'; this._ensureJS(); this.modeName='المحرك الداخلي'; }
+    this._inited=true; if(onStatus)onStatus(this.modeName);
+  }
+  stop(){ /* الإيقاف عبر stopFlag بين الوضعيات */ }
+  _enqueue(fn){ this._queue=this._queue.then(fn,fn); return this._queue; }
+
+  /* تحليل Stockfish (UCI + MultiPV) مع ميزانية وقت أو عمق */
+  _sfAnalyze(fen,{depth,movetime,multipv=1,onProgress}){
+    return new Promise((resolve)=>{
+      const lines={}; const start=Date.now(); const target=depth||30;
+      this._sfHandler=(l)=>{
+        if(l.indexOf('info')===0 && l.indexOf(' pv ')>=0 && l.indexOf('score')>=0){
+          const mp=l.match(/multipv (\d+)/); const idx=mp?+mp[1]:1;
+          const cp=l.match(/score cp (-?\d+)/); const mate=l.match(/score mate (-?\d+)/); const dM=l.match(/ depth (\d+)/);
+          const pv=l.split(' pv ')[1].trim().split(/\s+/);
+          lines[idx]={multipv:idx, move:pv[0], cp:cp?+cp[1]:null, mate:mate?+mate[1]:null, depth:dM?+dM[1]:0, pv};
+          if(onProgress){ if(movetime) onProgress(Math.min(0.99,(Date.now()-start)/movetime)); else if(dM) onProgress(Math.min(0.99,(+dM[1])/target)); }
+        } else if(l.indexOf('bestmove')===0){ const bm=l.split(/\s+/)[1]; this._sfHandler=null; if(onProgress)onProgress(1);
+          resolve({bestmove:bm, lines:Object.values(lines).sort((a,b)=>a.multipv-b.multipv)}); }
+      };
+      this.sf.postMessage('setoption name MultiPV value '+multipv);
+      this.sf.postMessage('position fen '+fen);
+      this.sf.postMessage(movetime?('go movetime '+movetime):('go depth '+(depth||16)));
+    });
+  }
+  /* تحليل المحرك الداخلي */
+  _jsAnalyze(fen,{depth,onProgress}){
+    return new Promise((resolve)=>{ this._ensureJS(); const id=++this._id; this._cbs[id]={resolve,onProgress}; this.jsW.postMessage({id,fen,depth}); });
+  }
+  /* تقييم وضعية واحدة (Stockfish) خلال وقت محدّد */
+  _sfEval(fen, movetime){
+    return new Promise((resolve)=>{ let last=null;
+      this._sfHandler=(l)=>{
+        if(l.indexOf('info')===0 && l.indexOf('score')>=0 && l.indexOf(' pv ')>=0){ const cp=l.match(/score cp (-?\d+)/); const mate=l.match(/score mate (-?\d+)/); last={cp:cp?+cp[1]:null, mate:mate?+mate[1]:null}; }
+        else if(l.indexOf('bestmove')===0){ this._sfHandler=null; resolve(last?scoreToCp(last):0); }
+      };
+      this.sf.postMessage('setoption name MultiPV value 1');
+      this.sf.postMessage('position fen '+fen);
+      this.sf.postMessage('go movetime '+movetime);
+    });
+  }
+  /* تقييم وضعية واحدة (المحرك الداخلي) بعمق */
+  _jsEval(fen, depth){
+    return new Promise((resolve)=>{ this._ensureJS(); const id=++this._id; this._cbs[id]={resolve:(d)=>resolve(d.cp||0)}; this.jsW.postMessage({id,fen,depth,evalOnly:true}); });
+  }
+  /* واجهة موحّدة: تقييم وضعية ناتجة عن نقلة (نُعطى ميزانية Stockfish وعمق المحرك الداخلي) */
+  evalAfter(fen, sfMovetime, jsDepth){
+    if(this.mode==='sf') return this._enqueue(()=>this._sfEval(fen, sfMovetime));
+    return this._enqueue(()=>this._jsEval(fen, jsDepth));
+  }
+
+  /* ---- واجهات عُليا حسب المستوى (1..5) ---- */
+  analyzeGame(fen, level, onProgress){
+    if(this.mode==='sf') return this._enqueue(()=>this._sfAnalyze(fen,{depth:10+level*2, multipv:2, onProgress}));
+    return this._enqueue(()=>this._jsAnalyze(fen,{depth:Math.min(4,level), onProgress}));
+  }
+  analyzeFind(fen, level, multipv, onProgress){
+    const L=Math.max(1, level||1);
+    if(this.mode==='sf') return this._enqueue(()=>this._sfAnalyze(fen,{movetime:Math.min(4500,L*900), multipv:Math.min(multipv||1,128), onProgress}));
+    return this._enqueue(()=>this._jsAnalyze(fen,{depth:Math.min(5,L), onProgress}));
+  }
+}
+const engine = new Engine();
+</script>
+
+<script>
+/* =====================================================================
+   4) منطق تصنيف النقلات (heuristic فوق تقييمات Stockfish)
+   تنبيه: التصنيفات تقريبية وليست مطابقة لنظام chess.com الداخلي.
+   ===================================================================== */
+const CLASS_INFO = {
+  Brilliant:{sym:'‼', css:'var(--c-brilliant)'},
+  Great:    {sym:'!', css:'var(--c-great)'},
+  Best:     {sym:'★', css:'var(--c-best)'},
+  Excellent:{sym:'✓', css:'var(--c-excellent)'},
+  Good:     {sym:'✓', css:'var(--c-good)'},
+  Book:     {sym:'📖',css:'var(--c-book)'},
+  Inaccuracy:{sym:'?!',css:'var(--c-inaccuracy)'},
+  Mistake:  {sym:'?', css:'var(--c-mistake)'},
+  Blunder:  {sym:'??',css:'var(--c-blunder)'},
+};
+
+/* تقييم ثابت لتبادل القطع على مربع (Static Exchange Evaluation مبسّط) */
+function see(fen, square){
+  let chess; try{ chess=new Chess(fen); }catch(e){ return 0; }
+  const caps = chess.moves({verbose:true}).filter(m=>m.to===square && m.captured);
+  if(!caps.length) return 0;
+  caps.sort((a,b)=>PIECE_VALUE[a.piece]-PIECE_VALUE[b.piece]); // أقل قطعة مهاجِمة أولاً
+  const m=caps[0]; const captured=PIECE_VALUE[m.captured];
+  const child=new Chess(fen);
+  const res=child.move({from:m.from,to:m.to,promotion:(m.promotion||'q')});
+  if(!res) return 0;
+  return Math.max(0, captured - see(child.fen(), square));
+}
+/* تحليل التضحية: هل النقلة تضحّي بمادة لا تُسترد فوراً؟ */
+function sacrificeInfo(fenBefore, move){
+  const capturedValue = move.captured ? PIECE_VALUE[move.captured] : 0;
+  const child=new Chess(fenBefore);
+  const res=child.move({from:move.from,to:move.to,promotion:(move.promotion||'q')});
+  if(!res) return {isSac:false, amount:0, net:0};
+  const opponentGain = see(child.fen(), move.to);   // أفضل استرداد للخصم على مربع الوصول
+  const net = capturedValue - opponentGain;          // صافي المادة للّاعب على ذلك المربع
+  return {isSac: net <= -100, amount: Math.max(0,-net), net};
+}
+/* أداة: تعديل مربع في FEN وتغيير الدور (تُستخدم لحساب المدافعين) */
+function setSquareInFen(fen, square, pieceChar, turnColor){
+  const parts=fen.split(' '); const rows=parts[0].split('/');
+  const file='abcdefgh'.indexOf(square[0]); const rank=parseInt(square[1]); const rowIdx=8-rank;
+  const exp=[]; for(const ch of rows[rowIdx]){ if(/\d/.test(ch)){ for(let i=0;i<+ch;i++)exp.push(''); } else exp.push(ch); }
+  exp[file]=pieceChar;
+  let comp='',empty=0; for(let i=0;i<8;i++){ if(exp[i]===''){empty++;} else { if(empty){comp+=empty;empty=0;} comp+=exp[i]; } } if(empty)comp+=empty;
+  rows[rowIdx]=comp; parts[0]=rows.join('/'); parts[1]=turnColor; parts[3]='-';
+  return parts.join(' ');
+}
+/* عدد القطع المدافعة عن مربع (قطع لون القطعة المُؤكَلة التي تهاجم المربع) */
+function countDefenders(fen, square){
+  try{
+    const stm=fen.split(' ')[1];               // الدور = اللاعب المُحرِّك
+    const defender = stm==='w'?'b':'w';        // لون القطعة المُؤكَلة (المدافعون)
+    const probePiece = stm==='w'?'N':'n';      // نضع حصاناً من لون المُحرِّك على المربع (قانوني بأي مربع)
+    const probe=setSquareInFen(fen, square, probePiece, defender);
+    const c=new Chess(); if(!c.load(probe)) return 0;
+    return c.moves({verbose:true}).filter(m=>m.to===square && m.captured).length;
+  }catch(e){ return 0; }
+}
+
+/* القطعة الموجودة على مربع من نص FEN */
+function pieceAt(fen, square){
+  const rows=fen.split(' ')[0].split('/'); const file='abcdefgh'.indexOf(square[0]); const rank=parseInt(square[1]); const rowIdx=8-rank;
+  const exp=[]; for(const ch of rows[rowIdx]){ if(/\d/.test(ch)){ for(let i=0;i<+ch;i++)exp.push(''); } else exp.push(ch); }
+  const c=exp[file]; if(!c) return null;
+  return {color:c===c.toUpperCase()?'w':'b', type:c.toLowerCase(), value:PIECE_VALUE[c.toLowerCase()]||0};
+}
+/* قيم قطع لون "side" التي تهاجم المربع (مستقل عن الدور — نضع قطعة خصم عليه) */
+function attackerVals(fen, square, side){
+  try{
+    const occ = side==='w' ? 'n' : 'N';            // قطعة من لون الخصم على المربع لتُؤكَل
+    const probe=setSquareInFen(fen, square, occ, side);
+    const c=new Chess(); if(!c.load(probe)) return [];
+    return c.moves({verbose:true}).filter(m=>m.to===square && m.captured).map(m=>PIECE_VALUE[m.piece]).sort((a,b)=>a-b);
+  }catch(e){ return []; }
+}
+/* أقصى مكسب مادي فوري للخصم بعد النقلة (قطع معلّقة في أي مكان) */
+function maxHangingAfter(afterFen){
+  let c; try{ c=new Chess(afterFen); }catch(e){ return 0; }
+  const caps=c.moves({verbose:true}).filter(m=>m.captured); let best=0; const seen={};
+  for(const m of caps){ if(seen[m.to])continue; seen[m.to]=1; const g=see(afterFen, m.to); if(g>best)best=g; }
+  return best;
+}
+/* مقدار التضحية الحقيقي للنقلة: كم مادة يستطيع الخصم كسبها (يشمل النقلات الكاشفة والكش) */
+function sacAmount(fenBefore, move){
+  const child=new Chess(fenBefore);
+  if(!child.move({from:move.from,to:move.to,promotion:(move.promotion||'q')})) return 0;
+  const afterFen=child.fen();
+  const base=maxHangingAfter(afterFen);                       // أي قطعة معلّقة (يعمل دون كش)
+  // القطعة المنقولة قد تكون معلّقة حتى عند الكش (الخصم لا يأخذها فوراً لكنها مكشوفة)
+  const owner=fenBefore.split(' ')[1]; const opp=owner==='w'?'b':'w';
+  const movedVal=PIECE_VALUE[(move.promotion||move.piece)]||0;
+  const oppAtt=attackerVals(afterFen, move.to, opp); const def=attackerVals(afterFen, move.to, owner);
+  let enPrise=0;
+  if(oppAtt.length){ if(!def.length) enPrise=movedVal; else if(oppAtt[0]<movedVal) enPrise=movedVal-oppAtt[0]; }
+  return Math.max(base, enPrise);
+}
+
+/* احتمال الفوز (win%) من سنتيبون (صيغة شبيهة بـ Lichess) */
+function winPercent(cp){ const x=Math.max(-1500,Math.min(1500,cp)); return 50 + 50*(2/(1+Math.exp(-0.00368208*x)) - 1); }
+/* دقة النقلة من فرق win% (صيغة Lichess التقريبية) */
+function moveAccuracy(winBefore, winAfter){ const a=103.1668*Math.exp(-0.04354*(winBefore-winAfter))-3.1669; return Math.max(0,Math.min(100,a+1)); }
+
+/*
+  تصنيف نقلة واحدة.
+  المعطيات (كلها بسنتيبون من منظور اللاعب صاحب الدور):
+   cpBest      : تقييم أفضل نقلة في الوضع
+   cpPlayed    : تقييم الوضع بعد النقلة الملعوبة (= -تقييم الوضع التالي)
+   isBest      : هل النقلة الملعوبة == أفضل نقلة للمحرك
+   secondBest  : تقييم ثاني أفضل نقلة (أو null)
+   sac         : ناتج sacrificeInfo للنقلة الملعوبة
+*/
+function classifyMove({cpBest, cpPlayed, isBest, secondBest, sac}){
+  let cpl = Math.max(0, cpBest - cpPlayed);
+  if(cpl>100000) cpl=100000;
+  // Brilliant: تضحية حقيقية، تبقى من أفضل النقلات، ولا تخسر الأفضلية
+  if(sac && sac.isSac && sac.amount>=150 && cpl<=60 && cpPlayed>=-40){
+    return 'Brilliant';
+  }
+  // Great: النقلة الأفضل وتتفوّق بوضوح على البديل الثاني (نقلة شبه وحيدة في موقف حرج)
+  if(isBest && secondBest!=null && (cpBest-secondBest)>=160 && cpl<=40){
+    return 'Great';
+  }
+  if(isBest) return 'Best';
+  if(cpl<=20) return 'Excellent';
+  if(cpl<=50) return 'Good';
+  if(cpl<=110) return 'Inaccuracy';
+  if(cpl<=250) return 'Mistake';
+  return 'Blunder';
+}
+function classChip(key){ const c=CLASS_INFO[key]; return `<span class="classchip" style="background:${c.css}">${c.sym} ${T(key)}</span>`; }
+</script>
+
+<script>
+/* =====================================================================
+   5) القسم 1: جلب وتحليل المباريات
+   ===================================================================== */
+const sqFromIdx = i => FILES[i%8] + (Math.floor(i/8)+1);
+/* فك تشفير TCN الخاص بـ chess.com إلى نقلات from/to */
+function decodeTCN(n){
+  const TBL="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?{~}(^)[_]@#$";
+  const promo="qnrbkp"; const out=[];
+  for(let i=0;i<n.length;i+=2){
+    let c1=TBL.indexOf(n[i]); let c2=TBL.indexOf(n[i+1]); const mv={};
+    if(c2>63){ mv.promotion=promo[Math.floor((c2-64)/3)]; c2=c1+(c1<16?-8:8)+((c2-64)%3)-1; }
+    if(c1>63){ mv.drop=promo[c1-64]; } else { mv.from=sqFromIdx(c1); }
+    mv.to=sqFromIdx(c2); out.push(mv);
+  }
+  return out;
+}
+const CORS_PROXIES = [
+  u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+  u=>'https://corsproxy.io/?url='+encodeURIComponent(u),
+  u=>'https://thingproxy.freeboard.io/fetch/'+u,
+];
+async function fetchWithProxies(url){
+  // محاولة مباشرة أولاً ثم عبر بروكسيات CORS
+  try{ const r=await fetch(url); if(r.ok) return await r.text(); }catch(e){}
+  for(const p of CORS_PROXIES){ try{ const r=await fetch(p(url)); if(r.ok) return await r.text(); }catch(e){} }
+  throw new Error('CORS_BLOCKED');
+}
+async function fetchPGN(url){
+  url=url.trim();
+  // ---- Lichess (CORS مدعوم مباشرة) ----
+  let lm = url.match(/lichess\.org\/(?:game\/export\/)?([a-zA-Z0-9]{8})/);
+  if(lm){
+    const id=lm[1];
+    return await fetchWithProxies(`https://lichess.org/game/export/${id}?evals=false&clocks=false&literate=false`);
+  }
+  // ---- Chess.com ----
+  let cm = url.match(/chess\.com\/game\/(live|daily)\/(\d+)/) || url.match(/chess\.com\/(?:.*\/)?(\d{6,})/);
+  if(cm){
+    const type = cm[1]==='daily'?'daily':'live'; const id = cm[2]||cm[1];
+    const callback = `https://www.chess.com/callback/${type}/game/${id}`;
+    const txt = await fetchWithProxies(callback);
+    let data; try{ data=JSON.parse(txt); }catch(e){ throw new Error('CHESSCOM_PARSE'); }
+    const g = data.game || data;
+    if(g && g.moveList){
+      const mvs = decodeTCN(g.moveList);
+      const ch = new Chess();
+      for(const m of mvs){ if(m.drop){continue;} ch.move({from:m.from,to:m.to,promotion:m.promotion||'q'}); }
+      // ترويسات أساسية
+      const h=g.pgnHeaders||{};
+      Object.keys(h).forEach(k=>{ try{ch.header(k,String(h[k]));}catch(e){}});
+      return ch.pgn();
+    }
+    if(g && g.pgn) return g.pgn;
+    throw new Error('CHESSCOM_NO_DATA');
+  }
+  throw new Error('UNKNOWN_URL');
+}
+
+/* ---------- حالة العارض ---------- */
+let GA = null;        // نتيجة تحليل المباراة الحالية
+let curPly = 0;       // المؤشر الحالي (0 = الوضع الابتدائي)
+let analyzing=false, stopFlag=false;
+
+$('#fetchBtn').addEventListener('click', async()=>{
+  const url=$('#gameUrl').value.trim(); if(!url){ toast('أدخل رابط المباراة أولاً'); return; }
+  const st=$('#analyzeStatus'); st.innerHTML='<div class="spinner"></div> جاري الجلب…';
+  try{
+    const pgn=await fetchPGN(url); $('#pgnInput').value=pgn.trim(); st.textContent='✅ تم جلب الـ PGN. اضغط «تحليل المباراة».';
+    toast('تم جلب المباراة');
+  }catch(err){
+    let msg='تعذّر الجلب التلقائي.';
+    if(/chess\.com/i.test(url)) msg='تعذّر جلب مباراة Chess.com مباشرة (قيود CORS). افتح المباراة في chess.com ثم Share → PGN، والصق النص في خانة الـ PGN.';
+    else if(err.message==='UNKNOWN_URL') msg='رابط غير معروف. استخدم رابط Lichess أو Chess.com، أو الصق الـ PGN يدوياً.';
+    st.textContent='⚠️ '+msg; toast('تعذّر الجلب — الصق الـ PGN يدوياً');
+  }
+});
+
+$('#depthRange').addEventListener('input',e=>$('#depthVal').textContent=e.target.value);
+$('#depthRange2').addEventListener('input',e=>$('#depthVal2').textContent=e.target.value);
+$('#stopBtn').addEventListener('click',()=>{ stopFlag=true; engine.stop(); });
+
+$('#analyzeBtn').addEventListener('click', analyzeGame);
+
+async function analyzeGame(){
+  if(analyzing) return;
+  const pgn=$('#pgnInput').value.trim();
+  if(!pgn){ toast('الصق الـ PGN أو اجلب مباراة أولاً'); return; }
+  // تحليل الـ PGN
+  const parser=new Chess();
+  if(!parser.load_pgn(pgn,{sloppy:true})){ toast('صيغة PGN غير صحيحة'); $('#analyzeStatus').textContent='⚠️ تعذّر قراءة الـ PGN.'; return; }
+  const headers=parser.header();
+  const verbose=parser.history({verbose:true});
+  if(!verbose.length){ toast('لا توجد نقلات في الـ PGN'); return; }
+
+  const startFEN = headers.FEN || null;
+  const replay = startFEN ? new Chess(startFEN) : new Chess();
+  const fens=[replay.fen()]; const moves=[];
+  for(const mv of verbose){ const m=replay.move(mv.san,{sloppy:true}); if(!m){break;} moves.push(m); fens.push(replay.fen()); }
+
+  // إعداد الواجهة
+  analyzing=true; stopFlag=false;
+  $('#analyzeBtn').disabled=true; $('#stopBtn').style.display='';
+  $('#analyzeProgWrap').style.display=''; $('#analyzeProg').style.width='0%';
+  const st=$('#analyzeStatus');
+  const level=+$('#depthRange').value;
+
+  try{ await engine.init(name=>{ st.innerHTML='<div class="spinner"></div> المحرك: '+name; }); }
+  catch(err){ st.textContent='⚠️ '+err.message; analyzing=false; $('#analyzeBtn').disabled=false; $('#stopBtn').style.display='none'; return; }
+
+  // تحليل كل وضعية (المحرك يقيّم جميع النقلات الجذرية، فنحصل على الأفضل والثاني)
+  const total=fens.length;
+  const setPct=(frac)=>{ const p=Math.round(frac*100); $('#analyzeProg').style.width=p+'%'; $('#analyzePct').textContent=p+'%'; };
+  $('#analyzePct').style.display=''; setPct(0);
+  const posEval=[]; // {cpBest, second, bestUci} من منظور صاحب الدور في تلك الوضعية
+  for(let k=0;k<fens.length;k++){
+    if(stopFlag) break;
+    // الأوضاع المنتهية (كش مات/تعادل) تُقيّم مباشرة دون المحرك
+    let term=null; try{ const c=new Chess(fens[k]); if(c.game_over()){ term = c.in_checkmate() ? -1000000 : 0; } }catch(e){}
+    if(term!==null){ posEval.push({cpBest:term, second:null, bestUci:null}); setPct((k+1)/total); continue; }
+    st.innerHTML=`<div class="spinner"></div> [${engine.modeName}] تحليل الوضعية ${k+1}/${total} …`;
+    const res=await engine.analyzeGame(fens[k], level, (f)=>setPct((k+f)/total));
+    const l0=res.lines[0], l1=res.lines[1];
+    posEval.push({ cpBest: l0?scoreToCp(l0):0, second: l1?scoreToCp(l1):null, bestUci: (l0&&l0.move)|| res.bestmove });
+    setPct((k+1)/total);
+  }
+  if(stopFlag){ st.textContent='⏹️ تم إيقاف التحليل.'; analyzing=false; $('#analyzeBtn').disabled=false; $('#stopBtn').style.display='none'; $('#analyzeProgWrap').style.display='none'; $('#analyzePct').style.display='none'; return; }
+
+  // بناء التصنيفات
+  const analyzed=[]; const evalWhite=[];
+  for(let k=0;k<fens.length;k++){ const stm = fens[k].split(' ')[1]; const cp=posEval[k].cpBest; evalWhite.push(stm==='w'?cp:-cp); }
+  for(let k=0;k<moves.length;k++){
+    const mv=moves[k]; const stm=mv.color; // w/b
+    const cpBest=posEval[k].cpBest;
+    const second=posEval[k].second;
+    const cpPlayed = -(posEval[k+1].cpBest); // منظور اللاعب نفسه
+    const playedUci = mv.from+mv.to+(mv.promotion||'');
+    const isBest = posEval[k].bestUci===playedUci;
+    const sac = sacrificeInfo(fens[k], mv);
+    const key = classifyMove({cpBest, cpPlayed, isBest, secondBest:second, sac});
+    const winBefore=winPercent(cpBest), winAfter=winPercent(cpPlayed);
+    analyzed.push({san:mv.san, uci:playedUci, from:mv.from, to:mv.to, color:stm, flags:mv.flags, promotion:mv.promotion,
+      classKey:key, cpl:Math.max(0,cpBest-cpPlayed), acc:moveAccuracy(winBefore,winAfter), bestUci:posEval[k].bestUci});
+  }
+
+  GA={headers, fens, moves:analyzed, evalWhite, startFEN};
+  analyzing=false; $('#analyzeBtn').disabled=false; $('#stopBtn').style.display='none';
+  $('#analyzeProgWrap').style.display='none'; $('#analyzePct').style.display='none'; st.textContent='✅ اكتمل تحليل '+analyzed.length+' نقلة.';
+  renderAnalysis(); saveHistory(GA);
+}
+
+/* ---------- عرض نتيجة التحليل ---------- */
+function renderAnalysis(){
+  $('#boardCard1').style.display=''; $('#summaryCard').style.display='';
+  if(!board1){ board1=new Board($('#board1'),{mode:'view',orientation:'w'}); }
+  curPly=0; goToPly(0,false);
+  buildMoveList(); buildSummary(); drawEvalChart();
+}
+function buildMoveList(){
+  const ml=$('#moveList'); const m=GA.moves; let rows='';
+  for(let i=0;i<m.length;i+=2){
+    const wn=Math.floor(i/2)+1;
+    const w=m[i], b=m[i+1];
+    rows+=`<tr><td class="num">${wn}</td>`;
+    rows+=`<td class="mv" data-ply="${i}">${w.san}<span class="sym" style="color:${CLASS_INFO[w.classKey].css}">${CLASS_INFO[w.classKey].sym}</span></td>`;
+    rows+= b?`<td class="mv" data-ply="${i+1}">${b.san}<span class="sym" style="color:${CLASS_INFO[b.classKey].css}">${CLASS_INFO[b.classKey].sym}</span></td>`:'<td></td>';
+    rows+='</tr>';
+  }
+  ml.innerHTML='<table>'+rows+'</table>';
+  $$('#moveList .mv').forEach(td=>td.addEventListener('click',()=>goToPly(+td.dataset.ply+1)));
+}
+function buildSummary(){
+  const counts={w:{},b:{}}; let accW=[],accB=[];
+  GA.moves.forEach(mv=>{ const side=mv.color; counts[side][mv.classKey]=(counts[side][mv.classKey]||0)+1; (side==='w'?accW:accB).push(mv.acc); });
+  const avg=a=>a.length?(a.reduce((x,y)=>x+y,0)/a.length):0;
+  $('#accWhite').textContent=avg(accW).toFixed(1)+'%';
+  $('#accBlack').textContent=avg(accB).toFixed(1)+'%';
+  const order=['Brilliant','Great','Best','Excellent','Good','Inaccuracy','Mistake','Blunder'];
+  const render=(c)=>order.filter(k=>c[k]).map(k=>`<div class="statline"><span><span class="dot" style="background:${CLASS_INFO[k].css}"></span>${T(k)}</span><b>${c[k]}</b></div>`).join('')||'<div class="statline" style="color:var(--text-dim)">—</div>';
+  $('#statsWhite').innerHTML=render(counts.w);
+  $('#statsBlack').innerHTML=render(counts.b);
+}
+function drawEvalChart(){
+  const cv=$('#evalChart'); const ctx=cv.getContext('2d'); const W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const ev=GA.evalWhite; const n=ev.length; if(n<2) return;
+  const mid=H/2; const clamp=v=>Math.max(-1000,Math.min(1000,v));
+  // خط المنتصف
+  ctx.strokeStyle='rgba(255,255,255,.15)'; ctx.beginPath(); ctx.moveTo(0,mid); ctx.lineTo(W,mid); ctx.stroke();
+  // المنطقة
+  ctx.beginPath(); ctx.moveTo(0,mid);
+  for(let i=0;i<n;i++){ const x=i/(n-1)*W; const y=mid - clamp(ev[i])/1000*(mid-6); ctx.lineTo(x,y); }
+  ctx.lineTo(W,mid); ctx.closePath();
+  const css=getComputedStyle(document.documentElement);
+  ctx.fillStyle=css.getPropertyValue('--primary').trim()+'55'; ctx.fill();
+  ctx.beginPath();
+  for(let i=0;i<n;i++){ const x=i/(n-1)*W; const y=mid - clamp(ev[i])/1000*(mid-6); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+  ctx.strokeStyle=css.getPropertyValue('--primary-2').trim(); ctx.lineWidth=2; ctx.stroke();
+}
+function updateEvalBar(cpWhite){
+  const wp=winPercent(cpWhite); const bar=$('#evalBar1');
+  bar.querySelector('.white').style.height=wp+'%';
+  const t=bar.querySelector('.txt');
+  if(Math.abs(cpWhite)>=100000){ t.textContent=(cpWhite>0?'#':'-#'); }
+  else { const val=cpWhite/100; t.textContent=(val>=0?'+':'')+val.toFixed(1); }
+  t.classList.toggle('neg', cpWhite<0);
+}
+/* الانتقال إلى نقلة (ply = عدد النقلات الملعوبة، 0..N) */
+function goToPly(ply, animate=true){
+  if(!GA) return; ply=Math.max(0,Math.min(GA.fens.length-1,ply));
+  const prev=curPly; curPly=ply;
+  if(animate && ply===prev+1){ board1.animateMove(GA.moves[ply-1]); }
+  else { board1.setFEN(GA.fens[ply]); }
+  // إبراز آخر نقلة + الشارة
+  if(ply>0){ const mv=GA.moves[ply-1]; const ci=CLASS_INFO[mv.classKey]; setTimeout(()=>board1.highlight(mv.from,mv.to,{sym:ci.sym,color:ci.css}), animate&&ply===prev+1?220:0);
+    $('#moveInfo').innerHTML=`<span style="color:${ci.css}">${ci.sym} ${T(mv.classKey)}</span> — ${mv.san}` + (mv.classKey!=='Best'&&mv.classKey!=='Brilliant'&&mv.classKey!=='Great'? ` · الأفضل: <span dir="ltr">${mv.bestUci}</span>`:'');
+  } else { board1.clearHighlights(); $('#moveInfo').textContent=''; }
+  updateEvalBar(GA.evalWhite[ply]);
+  $$('#moveList .mv').forEach(td=>td.classList.toggle('current', +td.dataset.ply===ply-1));
+  const cur=$('#moveList .mv.current'); if(cur) cur.scrollIntoView({block:'nearest'});
+}
+$('#navStart').onclick=()=>goToPly(0,false);
+$('#navPrev').onclick=()=>goToPly(curPly-1,false);
+$('#navNext').onclick=()=>goToPly(curPly+1,true);
+$('#navEnd').onclick=()=>goToPly(GA?GA.fens.length-1:0,false);
+$('#navFlip').onclick=()=>{ if(board1){ board1.flip(); board1.setFEN(GA.fens[curPly]); if(curPly>0){const mv=GA.moves[curPly-1];const ci=CLASS_INFO[mv.classKey];board1.highlight(mv.from,mv.to,{sym:ci.sym,color:ci.css});} } };
+</script>
+
+<script>
+/* =====================================================================
+   6) القسم 2: محرّر الوضعية + الباحث عن النقلات الرائعة
+   ===================================================================== */
+let selectedSide='w';
+function buildPalette(){
+  const pal=$('#palette'); pal.innerHTML='';
+  const order=[['w','k'],['w','q'],['w','r'],['w','b'],['w','n'],['w','p'],
+               ['b','k'],['b','q'],['b','r'],['b','b'],['b','n'],['b','p']];
+  order.forEach(([c,t])=>{
+    const d=document.createElement('div'); d.className='pp '+c; d.textContent=GLYPH[t];
+    d.dataset.c=c; d.dataset.t=t;
+    d.onclick=()=>selectPalette(d,c,t,false);
+    pal.appendChild(d);
+  });
+  const trash=document.createElement('div'); trash.className='pp trash'; trash.textContent='🗑'; trash.dataset.trash='1';
+  trash.onclick=()=>selectPalette(trash,null,null,true);
+  pal.appendChild(trash);
+}
+function selectPalette(el,c,t,erase){
+  const already=el.classList.contains('sel');
+  $$('#palette .pp').forEach(p=>p.classList.remove('sel'));
+  if(already){ board2.setDragPiece(null,null); board2.eraseMode=false; return; }
+  el.classList.add('sel');
+  if(erase){ board2.eraseMode=true; board2.setDragPiece(null,null); }
+  else { board2.eraseMode=false; board2.setDragPiece(c,t); }
+}
+$('#sideSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; selectedSide=b.dataset.side; $$('#sideSeg button').forEach(x=>x.classList.toggle('active',x===b)); board2.setOrientation(selectedSide); });
+$('#flipBoard2Btn').onclick=()=>{ board2.flip(); };
+$('#startPosBtn').onclick=()=>{ board2.setFEN('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR'); clearFinderResults(); };
+$('#clearBoardBtn').onclick=()=>{ board2.clear(); clearFinderResults(); };
+function clearFinderResults(){ $('#brilliantResults').innerHTML=''; $('#findStatus').textContent=''; if(board2)board2.clearHighlights(); }
+
+$('#findBtn').addEventListener('click', findBrilliantMoves);
+/*
+  منطق قريب من chess.com:
+  - نُولّد كل النقلات القانونية ونُقيّم نتيجة كلٍّ منها بالمحرك (Stockfish إن وُجد وإلا الداخلي).
+  - أفضل نقلة = أعلى تقييم (دقيقة 100% مع Stockfish).
+  - Brilliant = تضحية مادية سليمة (الخصم يستطيع أخذها) تبقى ضمن الأفضل ولا تخسر الأفضلية،
+    ولست رابحاً بشكل ساحق أصلاً (إلا إن كانت تفرض كش مات).
+  - Great = النقلة الأفضل والوحيدة عملياً (فارق كبير عن البديل) أو أكلة حاسمة وحيدة.
+  - نعرض دائماً أفضل نقلة + سبب التصنيف (كش مات / تضحية / كسب مادي / النقلة الوحيدة).
+*/
+async function findBrilliantMoves(){
+  // ===== التحقق من صحة الوضعية (ملك واحد لكل لون + FEN صالح) =====
+  let wk=0,bk=0; for(const sq in board2.position){ const p=board2.position[sq]; if(p.type==='k'){ p.color==='w'?wk++:bk++; } }
+  if(wk!==1||bk!==1){ toast('يجب وجود ملك أبيض واحد وملك أسود واحد'); $('#findStatus').textContent='⚠️ الوضعية تحتاج ملكاً واحداً لكل لون.'; return; }
+  const fen=board2.toFEN(selectedSide);
+  let ch=new Chess();
+  const v=ch.validate_fen?ch.validate_fen(fen):{valid:true};
+  if(!v.valid || !ch.load(fen)){ toast('وضعية غير صالحة'); $('#findStatus').textContent='⚠️ وضعية غير صالحة: '+(v.error||''); return; }
+  const legal=ch.moves({verbose:true});
+  if(!legal.length){ toast('لا توجد نقلات قانونية (كش مات/تعادل)'); $('#findStatus').textContent='لا توجد نقلات.'; return; }
+
+  const st=$('#findStatus'); const out=$('#brilliantResults'); const level=+$('#depthRange2').value;
+  $('#findBtn').disabled=true; $('#findProgWrap').style.display=''; $('#findPct').style.display='';
+  clearFinderResults();
+  const uciOf=m=>m.from+m.to+(m.promotion||'');
+  const setPct=(f)=>{ const p=Math.max(0,Math.min(100,Math.round(f*100))); $('#findProg').style.width=p+'%'; $('#findPct').textContent=p+'%'; };
+  const MATE_TH=30000;
+  const fmtEval=cp=> Math.abs(cp)>=MATE_TH ? (cp>0?'#':'-#') : ((cp>=0?'+':'')+(cp/100).toFixed(2));
+
+  // ===== الخطوة 0: تهيئة المحرك =====
+  setPct(0); st.innerHTML='<div class="spinner"></div> تهيئة المحرك…';
+  try{ await engine.init(); }
+  catch(err){ st.textContent='⚠️ '+err.message; $('#findBtn').disabled=false; $('#findProgWrap').style.display='none'; $('#findPct').style.display='none'; return; }
+
+  // ===== الخطوة 1: تقييم كل نقلة بالمحرك (5% → 70%) =====
+  const n=legal.length;
+  const totalBudget=Math.min(4800, Math.max(1600, level*1000));        // ميزانية وقت Stockfish الكلية (مللي ثانية)
+  const perMoveMt=Math.max(60, Math.min(380, Math.round(totalBudget/n)));
+  const jsDepth=Math.min(4, level+1);
+  const evalMap={}; const afterFenMap={};
+  for(let i=0;i<n;i++){
+    const m=legal[i]; const uci=uciOf(m);
+    const c=new Chess(fen); c.move({from:m.from,to:m.to,promotion:(m.promotion||'q')}); const af=c.fen(); afterFenMap[uci]=af;
+    st.innerHTML=`<div class="spinner"></div> [${engine.modeName}] تقييم ${m.san} (${i+1}/${n})`;
+    let cp;
+    if(c.in_checkmate()) cp=1000000;                 // نقلتنا كش مات
+    else if(c.game_over()) cp=0;                     // تعادل
+    else { const ev=await engine.evalAfter(af, perMoveMt, jsDepth); cp = -ev; }  // ev من منظور الخصم → نعكسها
+    evalMap[uci]=cp;
+    setPct(0.05 + ((i+1)/n)*0.65);
+  }
+
+  // ترتيب كل النقلات (أفضل نقلة = أعلى تقييم)
+  const evals=legal.map(m=>({m, uci:uciOf(m), cp: evalMap[uciOf(m)]})).filter(e=>e.cp!=null).sort((a,b)=>b.cp-a.cp);
+  const cpBest=evals[0].cp; const bestUci=evals[0].uci;
+  const second=evals.length>1?evals[1].cp:(cpBest-1000);
+  const gap=cpBest-second;
+
+  // ===== الخطوة 2: استخراج خصائص كل نقلة وتصنيفها (70% → 90%) =====
+  setPct(0.72); st.innerHTML='<div class="spinner"></div> تحليل أسباب التميّز…';
+  function feats(e){
+    const cpPlayed=e.cp; const cpl=Math.max(0,cpBest-cpPlayed); const isBest=(e.uci===bestUci);
+    const isMateUs=cpPlayed>=MATE_TH;
+    const cc=new Chess(fen); cc.move({from:e.m.from,to:e.m.to,promotion:(e.m.promotion||'q')});
+    const givesCheck=cc.in_check();
+    const sac=sacAmount(fen, e.m);                                   // مقدار التضحية المادية
+    const capNet=e.m.captured ? sacrificeInfo(fen,e.m).net : 0;      // صافي الكسب المادي للأكل
+    return {cpPlayed,cpl,isBest,isMateUs,givesCheck,sac,capNet};
+  }
+  function classify(e,f){
+    // Brilliant: تضحية سليمة، قريبة من الأفضل، لا تخسر، ولست رابحاً ساحقاً (إلا بكش مات)
+    if(f.sac>=100 && f.cpl<=90 && f.cpPlayed>=-50 && (cpBest<=700 || f.isMateUs)) return 'Brilliant';
+    // Great: النقلة الأفضل والوحيدة عملياً، أو أكلة حاسمة وحيدة
+    if(f.isBest && ((gap>=120 && f.cpl<=40) || (e.m.captured && gap>=80 && f.cpl<=40 && f.capNet>0))) return 'Great';
+    if(f.isBest) return 'Best';
+    return null;
+  }
+  function explain(e,f){
+    const p=[];
+    if(f.isMateUs) p.push('يفرض كش مات إجباري');
+    if(f.sac>=100) p.push(`تضحية سليمة بـ ${(f.sac/100).toFixed(1)} وحدة (الخصم يقدر يأخذها لكنها لا تُسترد)`);
+    if(f.capNet>0 && f.sac<100) p.push(`يكسب ${(f.capNet/100).toFixed(1)} وحدة مادية`);
+    if(f.givesCheck && !f.isMateUs) p.push('يعطي كش');
+    if(f.isBest && gap>=120 && f.sac<100 && !f.isMateUs) p.push(`النقلة الأفضل بفارق ${Math.min(gap,99999)} سنتيبون عن التالية`);
+    if(!p.length) p.push(`أفضل نقلة (تقييم ${fmtEval(e.cp)})`);
+    return p.join(' · ');
+  }
+
+  const brilliant=[], great=[];
+  for(const e of evals){
+    const f=feats(e); const key=classify(e,f);
+    if(key==='Brilliant') brilliant.push({...e, key, f, why:explain(e,f)});
+    else if(key==='Great') great.push({...e, key, f, why:explain(e,f)});
+  }
+  const bestE=evals[0]; const bestF=feats(bestE); const bestKey=classify(bestE,bestF)||'Best';
+  const bestWhy=explain(bestE,bestF);
+  setPct(0.9);
+
+  // ===== الخطوة 3: العرض (90% → 100%) =====
+  const card=(f)=>{ const ci=CLASS_INFO[f.key];
+    return `<div class="brilliant-card"><span class="mvbig">${f.m.san}</span>`
+      +`<div style="font-size:11px;color:var(--text-dim)">تقييم بعد النقلة: <b dir="ltr">${fmtEval(f.cp)}</b> · ${f.why}</div>`
+      +`<span class="tag">${classChip(f.key)}</span></div>`; };
+
+  let html='';
+  // بطاقة "أفضل نقلة" تظهر دائماً
+  const bci=CLASS_INFO[bestKey];
+  html+=`<h2 style="margin:6px 0 2px">⭐ أفضل نقلة</h2>`;
+  html+=`<div class="brilliant-card" style="border-color:${bci.css}"><span class="mvbig">${bestE.m.san}</span>`
+      +`<div style="font-size:11px;color:var(--text-dim)">تقييم: <b dir="ltr">${fmtEval(bestE.cp)}</b> · ${bestWhy}</div>`
+      +`<span class="tag">${classChip(bestKey)}</span></div>`;
+
+  const brilliantOthers=brilliant.filter(b=>b.uci!==bestUci);
+  const greatOthers=great.filter(g=>g.uci!==bestUci && !brilliant.some(b=>b.uci===g.uci));
+  if(brilliantOthers.length){ html+=`<h2 style="margin:12px 0 2px">${CLASS_INFO.Brilliant.sym} <span style="color:${CLASS_INFO.Brilliant.css}">${T('Brilliant')}</span> (${brilliantOthers.length})</h2>`+brilliantOthers.map(card).join(''); }
+  if(greatOthers.length){ html+=`<h2 style="margin:12px 0 2px">${CLASS_INFO.Great.sym} <span style="color:${CLASS_INFO.Great.css}">${T('Great')}</span> (${greatOthers.length})</h2>`+greatOthers.map(card).join(''); }
+  out.innerHTML=html;
+
+  // إبراز أفضل نقلة على الرقعة
+  board2.highlight(bestE.m.from, bestE.m.to, {sym:bci.sym, color:bci.css});
+
+  const totalB=brilliant.length, totalG=great.filter(g=>!brilliant.some(b=>b.uci===g.uci)).length;
+  st.innerHTML = `أفضل نقلة: <b dir="ltr">${bestE.m.san}</b> [${T(bestKey)}] · عبقرية: ${totalB} · رائعة: ${totalG}`;
+
+  // ===== الخطوة 4: إنهاء العداد =====
+  setPct(1);
+  $('#findBtn').disabled=false;
+  setTimeout(()=>{ $('#findProgWrap').style.display='none'; $('#findPct').style.display='none'; },600);
+}
+
+/* =====================================================================
+   6.5) رأي محرك خارجي (Stockfish سحابي مجاني) + مراجعة محرّكك المحلي
+   - chessigma لا يملك API (Stockfish داخل المتصفح)، لذا نستخدم REST APIs مجانية.
+   - نجلب أفضل نقلة من المحرك الخارجي ثم نراجعها بمحرّكك ونصنّفها ونقارن.
+   ===================================================================== */
+function uciToSan(fen, uci){ try{ const c=new Chess(fen); const m=c.move({from:uci.slice(0,2),to:uci.slice(2,4),promotion:uci.slice(4,5)||undefined}); return m?m.san:null; }catch(e){ return null; } }
+
+async function fetchExternalBest(fen, depth){
+  // 1) stockfish.online (REST، تقييم من منظور الأبيض)
+  try{
+    const url='https://stockfish.online/api/s/v2.php?fen='+encodeURIComponent(fen)+'&depth='+Math.min(15,Math.max(1,depth));
+    const txt=await fetchWithProxies(url); const d=JSON.parse(txt);
+    if(d && d.success && d.bestmove){ const bm=String(d.bestmove).split(/\s+/)[1];
+      if(bm && bm!=='(none)') return {source:'stockfish.online', uci:bm, evalWhiteCp:(d.mate!=null?null:(typeof d.evaluation==='number'?Math.round(d.evaluation*100):null)), mate:(d.mate!=null?d.mate:null), depth:Math.min(15,depth)}; }
+  }catch(e){}
+  // 2) chess-api.com (REST بديل) — نأخذ النقلة فقط لتجنّب لبس إشارة التقييم
+  try{
+    const r=await fetch('https://chess-api.com/v1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fen, depth:Math.min(18,depth+3)})});
+    if(r.ok){ const d=await r.json(); if(d && d.move) return {source:'chess-api.com', uci:d.move, evalWhiteCp:null, mate:(d.mate||null), depth:d.depth||depth}; }
+  }catch(e){}
+  throw new Error('تعذّر الوصول إلى المحرك الخارجي (تحقّق من اتصال الإنترنت).');
+}
+
+$('#extBtn').addEventListener('click', reviewExternalMove);
+async function reviewExternalMove(){
+  // التحقق من الوضعية
+  let wk=0,bk=0; for(const sq in board2.position){ const p=board2.position[sq]; if(p.type==='k'){ p.color==='w'?wk++:bk++; } }
+  if(wk!==1||bk!==1){ toast('يجب وجود ملك أبيض واحد وملك أسود واحد'); return; }
+  const fen=board2.toFEN(selectedSide);
+  const ch=new Chess(); const v=ch.validate_fen?ch.validate_fen(fen):{valid:true};
+  if(!v.valid||!ch.load(fen)){ toast('وضعية غير صالحة'); return; }
+  const legal=ch.moves({verbose:true}); if(!legal.length){ toast('لا توجد نقلات قانونية'); return; }
+
+  const level=+$('#depthRange2').value; const extDepth=Math.min(15, 9+level);
+  const st=$('#extStatus'); const out=$('#extResult'); out.innerHTML='';
+  $('#extBtn').disabled=true; st.innerHTML='<div class="spinner"></div> جلب الرأي من المحرك الخارجي…';
+
+  // 1) جلب أفضل نقلة خارجياً
+  let ext; try{ ext=await fetchExternalBest(fen, extDepth); }
+  catch(err){ st.textContent='⚠️ '+err.message; $('#extBtn').disabled=false; return; }
+  const sideToMove=fen.split(' ')[1];
+  const mvObj=legal.find(m=> (m.from+m.to+(m.promotion||''))===ext.uci) || legal.find(m=> (m.from+m.to)===String(ext.uci).slice(0,4));
+  if(!mvObj){ st.textContent='⚠️ المحرك الخارجي أعاد نقلة غير صالحة لهذا الوضع: '+ext.uci; $('#extBtn').disabled=false; return; }
+  // تقييم المحرك الخارجي بمنظور صاحب الدور
+  let extMover=null, extMate=null;
+  if(ext.mate!=null) extMate = sideToMove==='w'?ext.mate:-ext.mate;
+  else if(ext.evalWhiteCp!=null) extMover = sideToMove==='w'?ext.evalWhiteCp:-ext.evalWhiteCp;
+
+  // 2) مراجعة محرّكك المحلي
+  st.innerHTML='<div class="spinner"></div> مراجعة محرّكك المحلي…';
+  try{ await engine.init(); }catch(e){ st.textContent='⚠️ '+e.message; $('#extBtn').disabled=false; return; }
+  st.innerHTML='<div class="spinner"></div> مراجعة محرّكك ('+engine.modeName+')…';
+  const la=await engine.analyzeGame(fen, level, ()=>{});
+  const localBestUci=(la&&la.bestmove)||((la.lines&&la.lines[0])?la.lines[0].move:null);
+  const cpBest=(la.lines&&la.lines[0])?scoreToCp(la.lines[0]):0;
+  const second=(la.lines&&la.lines[1])?scoreToCp(la.lines[1]):null;
+  const localBestSan=localBestUci?uciToSan(fen, localBestUci):'?';
+  // تقييم محرّكك للنقلة المقترحة
+  const cAfter=new Chess(fen); cAfter.move({from:mvObj.from,to:mvObj.to,promotion:(mvObj.promotion||'q')});
+  let cpPlayed; if(cAfter.in_checkmate())cpPlayed=1000000; else if(cAfter.game_over())cpPlayed=0;
+  else { const mt=Math.max(250,level*220); const ev=await engine.evalAfter(cAfter.fen(), mt, Math.min(4,level+1)); cpPlayed=-ev; }
+  const cpl=Math.max(0,cpBest-cpPlayed);
+  const isBest=(ext.uci===localBestUci)||(String(ext.uci).slice(0,4)===String(localBestUci||'').slice(0,4));
+  const sac=sacrificeInfo(fen, mvObj);
+  const key=classifyMove({cpBest, cpPlayed, isBest, secondBest:second, sac});
+
+  // 3) العرض
+  const fmt=cp=>Math.abs(cp)>=30000?(cp>0?'#':'-#'):((cp>=0?'+':'')+(cp/100).toFixed(2));
+  const extEvalTxt = extMate!=null ? ((extMate>0?'#':'-#')+Math.abs(extMate)) : (extMover!=null?fmt(extMover):'—');
+  let html='';
+  html+=`<div style="font-size:13px;margin:6px 0 2px">🌐 اقتراح المحرك الخارجي [${ext.source} · عمق ${ext.depth}]</div>`;
+  html+=`<div class="brilliant-card"><span class="mvbig" dir="ltr">${mvObj.san}</span><div style="font-size:11px;color:var(--text-dim)">تقييمه: <b dir="ltr">${extEvalTxt}</b></div></div>`;
+  html+=`<div style="font-size:13px;margin:10px 0 2px">🔍 مراجعة محرّكك [${engine.modeName}]</div>`;
+  html+=`<div class="brilliant-card"><span class="mvbig" dir="ltr">${mvObj.san}</span><div style="font-size:11px;color:var(--text-dim)">تقييم محرّكك للنقلة: <b dir="ltr">${fmt(cpPlayed)}</b> · أفضل نقلة لديك: <b dir="ltr">${localBestSan}</b></div><span class="tag">${classChip(key)}</span></div>`;
+  html+= isBest ? `<div class="note" style="border-style:solid;color:var(--c-best)">✅ محرّكك يتّفق مع المحرك الخارجي على أفضل نقلة.</div>`
+                : `<div class="note" style="border-style:solid">ℹ️ محرّكك يفضّل <b dir="ltr">${localBestSan}</b> (الفارق ${cpl} سنتيبون عن نقلة المحرك الخارجي).</div>`;
+  html+=`<div class="btn-row"><button class="btn secondary" id="extPlayBtn">▶️ <span data-i18n="ext_play">${T('ext_play')}</span></button></div>`;
+  out.innerHTML=html;
+  board2.highlight(mvObj.from, mvObj.to, {sym:CLASS_INFO[key].sym, color:CLASS_INFO[key].css});
+  st.textContent=''; $('#extBtn').disabled=false;
+  $('#extPlayBtn').onclick=()=>{
+    const c=new Chess(fen); c.move({from:mvObj.from,to:mvObj.to,promotion:(mvObj.promotion||'q')});
+    board2.setFEN(c.fen()); selectedSide=c.turn();
+    $$('#sideSeg button').forEach(b=>b.classList.toggle('active', b.dataset.side===selectedSide));
+    board2.setOrientation(selectedSide);
+    clearFinderResults(); out.innerHTML=''; toast('تم لعب النقلة على الرقعة');
+  };
+}
+
+/* =====================================================================
+   7) السجل المحلي (localStorage)
+   ===================================================================== */
+const HIST_KEY='ca_history';
+function saveHistory(ga){
+  let h=[]; try{ h=JSON.parse(localStorage.getItem(HIST_KEY)||'[]'); }catch(e){}
+  const accs=(()=>{ let w=[],b=[]; ga.moves.forEach(m=>(m.color==='w'?w:b).push(m.acc)); const a=x=>x.length?(x.reduce((p,c)=>p+c,0)/x.length).toFixed(1):'--'; return {w:a(w),b:a(b)}; })();
+  const item={ id:Date.now(), date:new Date().toLocaleDateString(),
+    white:ga.headers.White||'?', black:ga.headers.Black||'?', result:ga.headers.Result||'',
+    event:ga.headers.Event||'', accW:accs.w, accB:accs.b, pgn:$('#pgnInput').value.trim(), data:ga };
+  h.unshift(item); if(h.length>15) h=h.slice(0,15);
+  try{ localStorage.setItem(HIST_KEY,JSON.stringify(h)); }catch(e){ /* قد تمتلئ المساحة */ }
+  renderHistory();
+}
+function renderHistory(){
+  let h=[]; try{ h=JSON.parse(localStorage.getItem(HIST_KEY)||'[]'); }catch(e){}
+  const el=$('#historyList');
+  if(!h.length){ el.innerHTML='<div class="empty">لا توجد تحليلات محفوظة بعد.</div>'; return; }
+  el.innerHTML=h.map((it,i)=>`<div class="hist-item" data-i="${i}">
+      <div class="meta" data-load="${i}">
+        <b>${it.white} ⚔ ${it.black}</b>
+        <span>${it.event||''} ${it.result||''} · الدقة: ${it.accW}% / ${it.accB}% · ${it.date}</span>
+      </div>
+      <button data-del="${i}" title="حذف">🗑</button>
+    </div>`).join('');
+  $$('#historyList [data-load]').forEach(m=>m.onclick=()=>loadHistory(+m.dataset.load));
+  $$('#historyList [data-del]').forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); deleteHistory(+b.dataset.del); });
+}
+function loadHistory(i){
+  let h=[]; try{ h=JSON.parse(localStorage.getItem(HIST_KEY)||'[]'); }catch(e){}
+  const it=h[i]; if(!it) return;
+  GA=it.data; $('#pgnInput').value=it.pgn||''; switchView('view-analyze');
+  $('#analyzeStatus').textContent='✅ تم تحميل تحليل محفوظ.';
+  renderAnalysis();
+}
+function deleteHistory(i){
+  let h=[]; try{ h=JSON.parse(localStorage.getItem(HIST_KEY)||'[]'); }catch(e){}
+  h.splice(i,1); localStorage.setItem(HIST_KEY,JSON.stringify(h)); renderHistory();
+}
+
+/* =====================================================================
+   8) القسم 3: لغز Lichess اليومي
+   ===================================================================== */
+let PZ=null;
+$('#loadPuzzleBtn').addEventListener('click', loadDailyPuzzle);
+async function loadDailyPuzzle(){
+  const st=$('#puzzleStatus'); st.innerHTML='<div class="spinner"></div> تحميل اللغز…';
+  try{
+    const txt=await fetchWithProxies('https://lichess.org/api/puzzle/daily'); const d=JSON.parse(txt);
+    const pgn=d.game.pgn; const initialPly=d.puzzle.initialPly; const solution=d.puzzle.solution.slice();
+    // إعادة تشغيل المباراة حتى وضع اللغز
+    const ch=new Chess();
+    const g=new Chess(); let hist=[];
+    if(g.load_pgn(pgn,{sloppy:true})){ hist=g.history({verbose:true}); }
+    else { const sans=pgn.split(/\s+/).filter(x=>x&&!/^\d+\.+$/.test(x)&&!x.startsWith('[')); sans.forEach(s=>{ const m=g.move(s,{sloppy:true}); if(m)hist.push(m); }); }
+    for(let i=0;i<initialPly && i<hist.length;i++){ ch.move(hist[i].san,{sloppy:true}); }
+    // النقلة الأولى من الحل هي نقلة الخصم (تُلعب تلقائياً كما في Lichess)
+    const opp0=solution[0]; const om=ch.move({from:opp0.slice(0,2),to:opp0.slice(2,4),promotion:opp0.slice(4,5)||'q'});
+    PZ={ch, solution, step:1, lastOpp:om};
+    $('#puzzleBoardWrap').style.display='';
+    if(!board3){ board3=new Board($('#board3'),{mode:'play', orientation:ch.turn(),
+        onMove:puzzleMove, onHints:(sq)=>PZ?PZ.ch.moves({square:sq,verbose:true}):[] }); }
+    board3.setOrientation(ch.turn()); board3.setFEN(ch.fen());
+    if(om) board3.highlight(om.from,om.to);
+    st.textContent='';
+    $('#puzzleInfo').innerHTML=`<span style="color:var(--accent)">دور ${ch.turn()==='w'?'الأبيض ♔':'الأسود ♚'}</span> — جِد أفضل نقلة!`;
+  }catch(e){ st.textContent='⚠️ تعذّر تحميل اللغز (تحقق من الاتصال).'; }
+}
+function puzzleMove(from,to){
+  if(!PZ) return false;
+  const legal=PZ.ch.moves({verbose:true}).find(m=>m.from===from&&m.to===to);
+  if(!legal) return false; // غير قانونية
+  const expected=PZ.solution[PZ.step];
+  if(from+to!==expected.slice(0,4)){
+    $('#puzzleInfo').innerHTML='<span style="color:var(--c-blunder)">✗ ليست النقلة الصحيحة، حاول مجدداً</span>';
+    return false; // ترجع القطعة
+  }
+  PZ.ch.move({from,to,promotion:expected.slice(4,5)||'q'}); PZ.step++; board3.setFEN(PZ.ch.fen());
+  if(PZ.step>=PZ.solution.length){ $('#puzzleInfo').innerHTML='<span style="color:var(--c-best)">✓ أحسنت! حُلّ اللغز 🎉</span>'; return true; }
+  // رد الخصم تلقائياً
+  setTimeout(()=>{
+    const opp=PZ.solution[PZ.step]; const f=opp.slice(0,2),t=opp.slice(2,4),p=opp.slice(4,5)||undefined;
+    const m=PZ.ch.move({from:f,to:t,promotion:p||'q'}); PZ.step++;
+    if(m) board3.animateMove(m);
+    if(PZ.step>=PZ.solution.length){ $('#puzzleInfo').innerHTML='<span style="color:var(--c-best)">✓ أحسنت! حُلّ اللغز 🎉</span>'; }
+    else $('#puzzleInfo').innerHTML='<span style="color:var(--accent)">✓ صحيح! تابع…</span>';
+  },350);
+  return true;
+}
+
+/* =====================================================================
+   9) التهيئة + الثيم + اللغة + التنقّل
+   ===================================================================== */
+function buildThemePresets(){
+  const wrap=$('#themePresets'); wrap.innerHTML='';
+  Object.keys(PRESETS).forEach(name=>{
+    const b=document.createElement('button'); b.className='tp'; b.textContent=name;
+    b.onclick=()=>{ const p=PRESETS[name]; THEME_VARS.forEach(v=>document.documentElement.style.setProperty(v,p[v])); THEME_VARS.forEach(v=>{const inp=$(`input[data-var="${v}"]`); if(inp)inp.value=p[v];}); saveTheme(); drawEvalChartSafe(); toast('تم تطبيق الثيم'); };
+    wrap.appendChild(b);
+  });
+}
+function drawEvalChartSafe(){ if(GA) drawEvalChart(); }
+
+function init(){
+  applyLang(LANG);
+  loadTheme();
+  buildThemePresets();
+  // محرّر الوضعية
+  board2=new Board($('#board2'),{mode:'edit'});
+  board2.setFEN('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR');
+  buildPalette();
+  renderHistory();
+
+  // التبويبات
+  $$('nav.tabs button').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
+  // أزرار الهيدر
+  $('#themeBtn').onclick=()=>switchView('view-settings');
+  $('#langBtn').onclick=()=>applyLang(LANG==='ar'?'en':'ar');
+  // مبدّلات الإعدادات
+  $$('input[data-var]').forEach(inp=>inp.addEventListener('input',()=>{ setThemeVar(inp.dataset.var,inp.value); drawEvalChartSafe(); }));
+  $('#langSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b)applyLang(b.dataset.lang); });
+  $('#resetThemeBtn').onclick=()=>{ localStorage.removeItem('ca_theme'); loadTheme(); drawEvalChartSafe(); toast('تمت إعادة الضبط'); };
+
+  // لمسة: منع التمرير أثناء سحب القطع على الرقعة
+  ['#board2','#board3'].forEach(s=>{ const el=$(s); if(el) el.addEventListener('touchmove',e=>{ if(e.target.classList.contains('piece'))e.preventDefault(); },{passive:false}); });
+}
+document.addEventListener('DOMContentLoaded',init);
+</script>
+
+</body>
+</html>
