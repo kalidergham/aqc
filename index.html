@@ -383,6 +383,17 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:14px 0;}
       <div id="brilliantResults"></div>
       <div class="note" data-i18n="approxNote2">⚠️ تعريف Brilliant/Great غير موثّق رسمياً من chess.com. هنا نعتبر النقلة Brilliant إذا كانت تضحية مادية (sacrifice) وتظل من أفضل النقلات وتحافظ على أفضلية، وGreat إذا كانت النقلة الجيدة الوحيدة تقريباً في موقف حرج.</div>
     </div>
+
+    <div class="card">
+      <h2>🌐 <span data-i18n="ext_title">رأي محرك خارجي + مراجعة محرّكك</span></h2>
+      <p class="hint" data-i18n="ext_hint">يجلب أفضل نقلة من محرك Stockfish خارجي (REST API) للوضع الحالي على الرقعة، ثم يراجعها محرّكك المحلي ويصنّفها ويقارن. (يحتاج إنترنت لجلب الرأي الخارجي فقط.)</p>
+      <div class="btn-row">
+        <button class="btn" id="extBtn">🌐 <span data-i18n="ext_get">أفضل نقلة (محرك خارجي) + مراجعة</span></button>
+      </div>
+      <div class="statusbar" id="extStatus"></div>
+      <div id="extResult"></div>
+      <div class="note" data-i18n="ext_note">ℹ️ موقع chessigma لا يوفّر API (يشغّل Stockfish داخل المتصفح فقط)، لذا نستخدم محرك Stockfish سحابياً مجانياً (stockfish.online ومع بديل chess-api.com) للحصول على نفس النتيجة القوية.</div>
+    </div>
   </section>
 
   <!-- ===================== القسم 3: تمرين تكتيكي يومي ===================== -->
@@ -843,6 +854,7 @@ const I18N = {
     whiteToMove:"دور الأبيض",blackToMove:"دور الأسود",startPos:"الوضع الابتدائي",clearBoard:"تفريغ الرقعة",flipBoard:"⟲ قلب الرقعة",
     t2_depth:"مستوى البحث (1 سريع … 5 أعمق):",t2_find:"ابحث عن النقلات الرائعة",
     approxNote2:"⚠️ نُقيّم كل نقلة ممكنة بالمحرك (Stockfish المحلي أو المحرك الداخلي). أفضل نقلة = أعلى تقييم. Brilliant = تضحية مادية سليمة (الخصم يقدر يأخذها لكنها لا تُسترد) تبقى ضمن الأفضل ولا تخسر الأفضلية ولست رابحاً ساحقاً. Great = النقلة الأفضل الوحيدة عملياً (فارق كبير عن البديل). تقريبي وقد يختلف عن chess.com.",
+    ext_title:"رأي محرك خارجي + مراجعة محرّكك",ext_hint:"يجلب أفضل نقلة من محرك Stockfish خارجي (REST API) للوضع الحالي، ثم يراجعها محرّكك المحلي ويصنّفها ويقارن. (يحتاج إنترنت لجلب الرأي الخارجي فقط.)",ext_get:"أفضل نقلة (محرك خارجي) + مراجعة",ext_note:"ℹ️ موقع chessigma لا يوفّر API (يشغّل Stockfish داخل المتصفح فقط)، لذا نستخدم محرك Stockfish سحابياً مجانياً (stockfish.online ومع بديل chess-api.com).",ext_play:"العب هذه النقلة",
     t3_title:"لغز اليوم التكتيكي",t3_hint:"لغز يومي من Lichess. جِد أفضل نقلة ونفّذها على الرقعة.",t3_load:"تحميل لغز اليوم",
     t4_title:"سجل التحليلات",t4_hint:"تُحفظ تحليلاتك محلياً في متصفحك. اضغط على أي عنصر لإعادة تحميله.",
     t5_title:"تخصيص المظهر",t5_hint:"غيّر ألوان الموقع ولون الرقعة. تُحفظ تلقائياً.",
@@ -864,6 +876,7 @@ const I18N = {
     whiteToMove:"White to move",blackToMove:"Black to move",startPos:"Start position",clearBoard:"Clear board",flipBoard:"⟲ Flip board",
     t2_depth:"Search level (1 fast … 5 deepest):",t2_find:"Find brilliant moves",
     approxNote2:"⚠️ Every legal move is evaluated by the engine (local Stockfish or built-in). Best = highest eval. Brilliant = a sound material sacrifice (the opponent can take it but can't profit) that stays among the best and keeps the advantage while not already crushing. Great = the practically only best move (big gap to the alternative). Approximate; may differ from chess.com.",
+    ext_title:"External engine opinion + your review",ext_hint:"Fetches the best move from an external Stockfish engine (REST API) for the current position, then your local engine reviews and classifies it and compares. (Needs internet only for the external opinion.)",ext_get:"Best move (external engine) + review",ext_note:"ℹ️ chessigma has no API (it runs Stockfish in the browser only), so we use a free cloud Stockfish (stockfish.online with chess-api.com fallback).",ext_play:"Play this move",
     t3_title:"Daily Tactics Puzzle",t3_hint:"Daily puzzle from Lichess. Find the best move and play it on the board.",t3_load:"Load today's puzzle",
     t4_title:"Analysis History",t4_hint:"Your analyses are saved locally in your browser. Tap any item to reload.",
     t5_title:"Customize Appearance",t5_hint:"Change site colors and board colors. Saved automatically.",
@@ -1755,6 +1768,95 @@ async function findBrilliantMoves(){
   setPct(1);
   $('#findBtn').disabled=false;
   setTimeout(()=>{ $('#findProgWrap').style.display='none'; $('#findPct').style.display='none'; },600);
+}
+
+/* =====================================================================
+   6.5) رأي محرك خارجي (Stockfish سحابي مجاني) + مراجعة محرّكك المحلي
+   - chessigma لا يملك API (Stockfish داخل المتصفح)، لذا نستخدم REST APIs مجانية.
+   - نجلب أفضل نقلة من المحرك الخارجي ثم نراجعها بمحرّكك ونصنّفها ونقارن.
+   ===================================================================== */
+function uciToSan(fen, uci){ try{ const c=new Chess(fen); const m=c.move({from:uci.slice(0,2),to:uci.slice(2,4),promotion:uci.slice(4,5)||undefined}); return m?m.san:null; }catch(e){ return null; } }
+
+async function fetchExternalBest(fen, depth){
+  // 1) stockfish.online (REST، تقييم من منظور الأبيض)
+  try{
+    const url='https://stockfish.online/api/s/v2.php?fen='+encodeURIComponent(fen)+'&depth='+Math.min(15,Math.max(1,depth));
+    const txt=await fetchWithProxies(url); const d=JSON.parse(txt);
+    if(d && d.success && d.bestmove){ const bm=String(d.bestmove).split(/\s+/)[1];
+      if(bm && bm!=='(none)') return {source:'stockfish.online', uci:bm, evalWhiteCp:(d.mate!=null?null:(typeof d.evaluation==='number'?Math.round(d.evaluation*100):null)), mate:(d.mate!=null?d.mate:null), depth:Math.min(15,depth)}; }
+  }catch(e){}
+  // 2) chess-api.com (REST بديل) — نأخذ النقلة فقط لتجنّب لبس إشارة التقييم
+  try{
+    const r=await fetch('https://chess-api.com/v1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fen, depth:Math.min(18,depth+3)})});
+    if(r.ok){ const d=await r.json(); if(d && d.move) return {source:'chess-api.com', uci:d.move, evalWhiteCp:null, mate:(d.mate||null), depth:d.depth||depth}; }
+  }catch(e){}
+  throw new Error('تعذّر الوصول إلى المحرك الخارجي (تحقّق من اتصال الإنترنت).');
+}
+
+$('#extBtn').addEventListener('click', reviewExternalMove);
+async function reviewExternalMove(){
+  // التحقق من الوضعية
+  let wk=0,bk=0; for(const sq in board2.position){ const p=board2.position[sq]; if(p.type==='k'){ p.color==='w'?wk++:bk++; } }
+  if(wk!==1||bk!==1){ toast('يجب وجود ملك أبيض واحد وملك أسود واحد'); return; }
+  const fen=board2.toFEN(selectedSide);
+  const ch=new Chess(); const v=ch.validate_fen?ch.validate_fen(fen):{valid:true};
+  if(!v.valid||!ch.load(fen)){ toast('وضعية غير صالحة'); return; }
+  const legal=ch.moves({verbose:true}); if(!legal.length){ toast('لا توجد نقلات قانونية'); return; }
+
+  const level=+$('#depthRange2').value; const extDepth=Math.min(15, 9+level);
+  const st=$('#extStatus'); const out=$('#extResult'); out.innerHTML='';
+  $('#extBtn').disabled=true; st.innerHTML='<div class="spinner"></div> جلب الرأي من المحرك الخارجي…';
+
+  // 1) جلب أفضل نقلة خارجياً
+  let ext; try{ ext=await fetchExternalBest(fen, extDepth); }
+  catch(err){ st.textContent='⚠️ '+err.message; $('#extBtn').disabled=false; return; }
+  const sideToMove=fen.split(' ')[1];
+  const mvObj=legal.find(m=> (m.from+m.to+(m.promotion||''))===ext.uci) || legal.find(m=> (m.from+m.to)===String(ext.uci).slice(0,4));
+  if(!mvObj){ st.textContent='⚠️ المحرك الخارجي أعاد نقلة غير صالحة لهذا الوضع: '+ext.uci; $('#extBtn').disabled=false; return; }
+  // تقييم المحرك الخارجي بمنظور صاحب الدور
+  let extMover=null, extMate=null;
+  if(ext.mate!=null) extMate = sideToMove==='w'?ext.mate:-ext.mate;
+  else if(ext.evalWhiteCp!=null) extMover = sideToMove==='w'?ext.evalWhiteCp:-ext.evalWhiteCp;
+
+  // 2) مراجعة محرّكك المحلي
+  st.innerHTML='<div class="spinner"></div> مراجعة محرّكك المحلي…';
+  try{ await engine.init(); }catch(e){ st.textContent='⚠️ '+e.message; $('#extBtn').disabled=false; return; }
+  st.innerHTML='<div class="spinner"></div> مراجعة محرّكك ('+engine.modeName+')…';
+  const la=await engine.analyzeGame(fen, level, ()=>{});
+  const localBestUci=(la&&la.bestmove)||((la.lines&&la.lines[0])?la.lines[0].move:null);
+  const cpBest=(la.lines&&la.lines[0])?scoreToCp(la.lines[0]):0;
+  const second=(la.lines&&la.lines[1])?scoreToCp(la.lines[1]):null;
+  const localBestSan=localBestUci?uciToSan(fen, localBestUci):'?';
+  // تقييم محرّكك للنقلة المقترحة
+  const cAfter=new Chess(fen); cAfter.move({from:mvObj.from,to:mvObj.to,promotion:(mvObj.promotion||'q')});
+  let cpPlayed; if(cAfter.in_checkmate())cpPlayed=1000000; else if(cAfter.game_over())cpPlayed=0;
+  else { const mt=Math.max(250,level*220); const ev=await engine.evalAfter(cAfter.fen(), mt, Math.min(4,level+1)); cpPlayed=-ev; }
+  const cpl=Math.max(0,cpBest-cpPlayed);
+  const isBest=(ext.uci===localBestUci)||(String(ext.uci).slice(0,4)===String(localBestUci||'').slice(0,4));
+  const sac=sacrificeInfo(fen, mvObj);
+  const key=classifyMove({cpBest, cpPlayed, isBest, secondBest:second, sac});
+
+  // 3) العرض
+  const fmt=cp=>Math.abs(cp)>=30000?(cp>0?'#':'-#'):((cp>=0?'+':'')+(cp/100).toFixed(2));
+  const extEvalTxt = extMate!=null ? ((extMate>0?'#':'-#')+Math.abs(extMate)) : (extMover!=null?fmt(extMover):'—');
+  let html='';
+  html+=`<div style="font-size:13px;margin:6px 0 2px">🌐 اقتراح المحرك الخارجي [${ext.source} · عمق ${ext.depth}]</div>`;
+  html+=`<div class="brilliant-card"><span class="mvbig" dir="ltr">${mvObj.san}</span><div style="font-size:11px;color:var(--text-dim)">تقييمه: <b dir="ltr">${extEvalTxt}</b></div></div>`;
+  html+=`<div style="font-size:13px;margin:10px 0 2px">🔍 مراجعة محرّكك [${engine.modeName}]</div>`;
+  html+=`<div class="brilliant-card"><span class="mvbig" dir="ltr">${mvObj.san}</span><div style="font-size:11px;color:var(--text-dim)">تقييم محرّكك للنقلة: <b dir="ltr">${fmt(cpPlayed)}</b> · أفضل نقلة لديك: <b dir="ltr">${localBestSan}</b></div><span class="tag">${classChip(key)}</span></div>`;
+  html+= isBest ? `<div class="note" style="border-style:solid;color:var(--c-best)">✅ محرّكك يتّفق مع المحرك الخارجي على أفضل نقلة.</div>`
+                : `<div class="note" style="border-style:solid">ℹ️ محرّكك يفضّل <b dir="ltr">${localBestSan}</b> (الفارق ${cpl} سنتيبون عن نقلة المحرك الخارجي).</div>`;
+  html+=`<div class="btn-row"><button class="btn secondary" id="extPlayBtn">▶️ <span data-i18n="ext_play">${T('ext_play')}</span></button></div>`;
+  out.innerHTML=html;
+  board2.highlight(mvObj.from, mvObj.to, {sym:CLASS_INFO[key].sym, color:CLASS_INFO[key].css});
+  st.textContent=''; $('#extBtn').disabled=false;
+  $('#extPlayBtn').onclick=()=>{
+    const c=new Chess(fen); c.move({from:mvObj.from,to:mvObj.to,promotion:(mvObj.promotion||'q')});
+    board2.setFEN(c.fen()); selectedSide=c.turn();
+    $$('#sideSeg button').forEach(b=>b.classList.toggle('active', b.dataset.side===selectedSide));
+    board2.setOrientation(selectedSide);
+    clearFinderResults(); out.innerHTML=''; toast('تم لعب النقلة على الرقعة');
+  };
 }
 
 /* =====================================================================
