@@ -363,6 +363,7 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:14px 0;}
 
       <div class="palette" id="palette"></div>
       <div class="btn-row">
+        <button class="btn ghost" id="flipBoard2Btn" data-i18n="flipBoard">⟲ قلب الرقعة</button>
         <button class="btn ghost" id="startPosBtn" data-i18n="startPos">الوضع الابتدائي</button>
         <button class="btn ghost" id="clearBoardBtn" data-i18n="clearBoard">تفريغ الرقعة</button>
       </div>
@@ -831,7 +832,7 @@ const I18N = {
     summary:"ملخص التحليل",white:"الأبيض",black:"الأسود",accuracy:"الدقة",
     approxNote:"⚠️ التصنيفات (خصوصاً Brilliant وGreat) تقريبية ومبنية على منطق حسابي فوق تقييمات المحرك الداخلي، وقد تختلف عن نظام chess.com الرسمي غير المعلن.",
     t2_title:"الباحث عن النقلة العبقرية",t2_hint:"رتّب القطع بحرية (اسحب وأفلِت)، اختر دور اللعب، ثم اضغط «بحث» ليُظهر فقط Brilliant (‼) أو Great (!).",
-    whiteToMove:"دور الأبيض",blackToMove:"دور الأسود",startPos:"الوضع الابتدائي",clearBoard:"تفريغ الرقعة",
+    whiteToMove:"دور الأبيض",blackToMove:"دور الأسود",startPos:"الوضع الابتدائي",clearBoard:"تفريغ الرقعة",flipBoard:"⟲ قلب الرقعة",
     t2_depth:"مستوى البحث (1 سريع … 5 أعمق):",t2_find:"ابحث عن النقلات الرائعة",
     approxNote2:"⚠️ تعريف Brilliant/Great غير موثّق رسمياً. هنا: Brilliant = تضحية مادية تظل من أفضل النقلات وتحافظ على أفضلية، وGreat = النقلة الجيدة الوحيدة تقريباً في موقف حرج.",
     t3_title:"لغز اليوم التكتيكي",t3_hint:"لغز يومي من Lichess. جِد أفضل نقلة ونفّذها على الرقعة.",t3_load:"تحميل لغز اليوم",
@@ -852,7 +853,7 @@ const I18N = {
     summary:"Analysis Summary",white:"White",black:"Black",accuracy:"Accuracy",
     approxNote:"⚠️ Classifications (especially Brilliant & Great) are approximate heuristics over the built-in engine's evaluations and may differ from Chess.com's undisclosed system.",
     t2_title:"Brilliant Move Finder",t2_hint:"Arrange pieces freely (drag & drop), pick side to move, then press Find to show only Brilliant (‼) or Great (!) moves.",
-    whiteToMove:"White to move",blackToMove:"Black to move",startPos:"Start position",clearBoard:"Clear board",
+    whiteToMove:"White to move",blackToMove:"Black to move",startPos:"Start position",clearBoard:"Clear board",flipBoard:"⟲ Flip board",
     t2_depth:"Search level (1 fast … 5 deepest):",t2_find:"Find brilliant moves",
     approxNote2:"⚠️ Brilliant/Great are not officially documented. Here: Brilliant = a material sacrifice that is still among the best moves and keeps an advantage; Great = the near-only good move in a critical position.",
     t3_title:"Daily Tactics Puzzle",t3_hint:"Daily puzzle from Lichess. Find the best move and play it on the board.",t3_load:"Load today's puzzle",
@@ -1531,7 +1532,8 @@ function selectPalette(el,c,t,erase){
   if(erase){ board2.eraseMode=true; board2.setDragPiece(null,null); }
   else { board2.eraseMode=false; board2.setDragPiece(c,t); }
 }
-$('#sideSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; selectedSide=b.dataset.side; $$('#sideSeg button').forEach(x=>x.classList.toggle('active',x===b)); });
+$('#sideSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; selectedSide=b.dataset.side; $$('#sideSeg button').forEach(x=>x.classList.toggle('active',x===b)); board2.setOrientation(selectedSide); });
+$('#flipBoard2Btn').onclick=()=>{ board2.flip(); };
 $('#startPosBtn').onclick=()=>{ board2.setFEN('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR'); clearFinderResults(); };
 $('#clearBoardBtn').onclick=()=>{ board2.clear(); clearFinderResults(); };
 function clearFinderResults(){ $('#brilliantResults').innerHTML=''; $('#findStatus').textContent=''; if(board2)board2.clearHighlights(); }
